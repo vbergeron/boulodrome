@@ -68,11 +68,19 @@ let read_raw ~uri =
   with Sys_error err -> Error Petanque.Agent.Error.(make_request (system err))
 
 let build_doc ~token ~uri =
-  let env = Option.get !env in
+  let current_env = Option.get !env in
+  let fresh_env =
+    Fleche.Doc.Env.make
+      ~init:current_env.init
+      ~workspace:current_env.workspace
+      ~files:(Coq.Files.bump current_env.files)
+  in
+  env := Some fresh_env;
+  Fleche.Memo.Intern.clear ();
   match read_raw ~uri with
   | Ok raw ->
     let languageId = "rocq" in
-    let doc = Fleche.Doc.create ~token ~env ~uri ~languageId ~version:0 ~raw in
+    let doc = Fleche.Doc.create ~token ~env:fresh_env ~uri ~languageId ~version:0 ~raw in
     print_diags doc;
     let target = Fleche.Doc.Target.End in
     Ok (Fleche.Doc.check ~io ~token ~target ~doc ())
