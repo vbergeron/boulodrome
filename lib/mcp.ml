@@ -60,7 +60,7 @@ let tool_error text =
 (* Params: single declaration -> schema + decoding                     *)
 (* ------------------------------------------------------------------ *)
 
-type param_type = String | Int | Bool
+type param_type = String | Int | Bool | StringArray
 
 type param =
   { name : string
@@ -74,6 +74,7 @@ let optional_string name desc = { name; desc; typ = String; required = false }
 let required_int name desc = { name; desc; typ = Int; required = true }
 let optional_int name desc = { name; desc; typ = Int; required = false }
 let optional_bool name desc = { name; desc; typ = Bool; required = false }
+let required_string_array name desc = { name; desc; typ = StringArray; required = true }
 
 type args = (string * Yojson.Safe.t) list
 
@@ -104,6 +105,18 @@ let get_bool_opt (args : args) key =
   | Some (`Bool b) -> Some b
   | _ -> None
 
+let get_string_list (args : args) key =
+  match List.assoc_opt key args with
+  | Some (`List items) ->
+    let rec collect acc = function
+      | [] -> Ok (List.rev acc)
+      | `String s :: rest -> collect (s :: acc) rest
+      | _ :: _ -> Error (Printf.sprintf "Field '%s' must be an array of strings" key)
+    in
+    collect [] items
+  | Some _ -> Error (Printf.sprintf "Field '%s' must be an array of strings" key)
+  | None -> Error (Printf.sprintf "Missing required field '%s'" key)
+
 let ( let* ) = Result.bind
 
 (* ------------------------------------------------------------------ *)
@@ -118,8 +131,17 @@ type tool_def =
   }
 
 let param_to_prop p =
-  let type_str = match p.typ with String -> "string" | Int -> "integer" | Bool -> "boolean" in
-  (p.name, `Assoc [ ("type", `String type_str); ("description", `String p.desc) ])
+  match p.typ with
+  | StringArray ->
+    ( p.name
+    , `Assoc
+        [ ("type", `String "array")
+        ; ("items", `Assoc [ ("type", `String "string") ])
+        ; ("description", `String p.desc)
+        ] )
+  | _ ->
+    let type_str = match p.typ with String -> "string" | Int -> "integer" | Bool -> "boolean" | StringArray -> assert false in
+    (p.name, `Assoc [ ("type", `String type_str); ("description", `String p.desc) ])
 
 let tool_to_json t =
   let props = List.map param_to_prop t.params in
