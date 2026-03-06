@@ -1,0 +1,7 @@
+(executable
+ (name boulodrome)
+ (public_name boulodrome)
+ (package boulodrome)
+ (libraries
+  boulodrome
+  logs))

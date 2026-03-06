@@ -1,0 +1,98 @@
+let init_coq ~debug ~record_comments =
+  let load_module = Dynlink.loadfile in
+  let load_plugin = Coq.Loader.plugin_handler None in
+  let vm, warnings = (true, None) in
+  Coq.Init.(
+    coq_init { debug; record_comments; load_module; load_plugin; vm; warnings })
+
+let io =
+  let trace hdr ?verbose:_ msg =
+    Format.eprintf "@[[trace] %s | %s @]@\n%!" hdr msg
+  in
+  let message ~lvl:_ ~message =
+    Format.eprintf "@[[message] %s @]@\n%!" message
+  in
+  let diagnostics ~uri:_ ~version:_ _diags = () in
+  let fileProgress ~uri:_ ~version:_ _pinfo = () in
+  let perfData ~uri:_ ~version:_ _perf = () in
+  let serverVersion _ = () in
+  let serverStatus _ = () in
+  let execInfo ~uri:_ ~version:_ ~range:_ = () in
+  { Fleche.Io.CallBack.trace
+  ; message
+  ; diagnostics
+  ; fileProgress
+  ; perfData
+  ; serverVersion
+  ; serverStatus
+  ; execInfo
+  }
+
+let init_st = ref None
+let env = ref None
+
+let setup_workspace ~token ~init ~debug ~cmdline ~root =
+  let dir = Lang.LUri.File.to_string_file root in
+  (let open Coq.Compat.Result.O in
+   let+ workspace = Coq.Workspace.guess ~token ~debug ~cmdline ~dir () in
+   let files = Coq.Files.make () in
+   Fleche.Doc.Env.make ~init ~workspace ~files)
+  |> Result.map_error (fun msg -> Petanque.Agent.Error.(make_request (coq msg)))
+
+let uri_of_path path =
+  let uri_str = Printf.sprintf "file://%s" path in
+  let uri = Lang.LUri.of_string uri_str in
+  Lang.LUri.File.of_uri uri
+  |> Result.map_error (fun msg ->
+         Petanque.Agent.Error.(make_request (system msg)))
+
+let init_agent ~token ~debug ~record_comments ~cmdline ~root =
+  init_st := Some (init_coq ~debug ~record_comments);
+  Fleche.Io.CallBack.set io;
+  let open Coq.Compat.Result.O in
+  let init = Option.get !init_st in
+  let* root_uri = uri_of_path root in
+  let+ env_ = setup_workspace ~token ~init ~debug ~cmdline ~root:root_uri in
+  env := Some env_
+
+let pp_diag fmt { Lang.Diagnostic.message; _ } =
+  Format.fprintf fmt "%a" Pp.pp_with message
+
+let print_diags (doc : Fleche.Doc.t) =
+  let d = Fleche.Doc.diags doc in
+  Format.(eprintf "@[<v>%a@]" (pp_print_list pp_diag) d)
+
+let read_raw ~uri =
+  let file = Lang.LUri.File.to_string_file uri in
+  try Ok Coq.Compat.Ocaml_414.In_channel.(with_open_text file input_all)
+  with Sys_error err -> Error Petanque.Agent.Error.(make_request (system err))
+
+let build_doc ~token ~uri =
+  let env = Option.get !env in
+  match read_raw ~uri with
+  | Ok raw ->
+    let languageId = "rocq" in
+    let doc = Fleche.Doc.create ~token ~env ~uri ~languageId ~version:0 ~raw in
+    print_diags doc;
+    let target = Fleche.Doc.Target.End in
+    Ok (Fleche.Doc.check ~io ~token ~target ~doc ())
+  | Error err -> Error err
+
+module SM = Lang.Compat.String.Map
+
+let toc_to_info (name, node) =
+  let open Coq.Compat.Option.O in
+  let+ ast = Fleche.Doc.Node.ast node in
+  (name, ast.Fleche.Doc.Node.Ast.ast_info)
+
+let doc_errors (doc : Fleche.Doc.t) =
+  Fleche.Doc.diags doc
+  |> List.filter Lang.Diagnostic.is_error
+  |> List.map (fun d ->
+    Format.asprintf "%a" Pp.pp_with d.Lang.Diagnostic.message)
+
+let get_toc ~token:_ ~(doc : Fleche.Doc.t) :
+    (string * Lang.Ast.Info.t list option) list Petanque.Agent.R.t =
+  let { Fleche.Doc.toc; _ } = doc in
+  let toc = SM.bindings toc |> List.filter_map toc_to_info in
+  Ok toc

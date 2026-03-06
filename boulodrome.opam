@@ -1,0 +1,14 @@
+opam-version: "2.0"
+name: "boulodrome"
+version: "0.1.0"
+synopsis: "MCP server for Rocq/Coq proof assistance via Petanque"
+depends: [
+  "ocaml" {>= "5.2.1"}
+  "dune" {>= "3.21"}
+  "yojson"
+  "logs"
+  "coq-lsp" {>= "0.2.5"}
+]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]

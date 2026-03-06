@@ -1,0 +1,3 @@
+(rocq.theory
+ (name Examples)
+ (theories Stdlib))

@@ -1,0 +1,9 @@
+(library
+ (name boulodrome)
+ (libraries
+  yojson
+  logs
+  coq-lsp.lang
+  coq-lsp.coq
+  coq-lsp.fleche
+  coq-lsp.petanque))

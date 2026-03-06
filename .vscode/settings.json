@@ -1,0 +1,11 @@
+{
+  "vsrocq.path": "/home/vbergeron/.opam/boulodrome/bin/vsrocqtop",
+  "vsrocq.args": [
+    "-Q", "/home/vbergeron/work/boulodrome/_build/default/examples", "Examples"
+  ],
+  "vsrocq.proof.mode": 1,
+  "ocaml.sandbox": {
+    "kind": "opam",
+    "switch": "boulodrome"
+  }
+}
