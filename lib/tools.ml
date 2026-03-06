@@ -27,19 +27,37 @@ let build_doc ~token path =
          (Printf.sprintf "Failed to load %s: %s" path
             (Agent.Error.to_string e.Request.Error.payload)))
 
+let count_stack_goals stack =
+  List.fold_left
+    (fun acc (l, r) -> acc + List.length l + List.length r)
+    0 stack
+
 (* Format a goals value into a human-readable string. *)
 let format_goals (goals_opt : (string, string) Coq.Goals.reified option) =
   match goals_opt with
   | None -> "No goals — proof may already be complete."
   | Some goals ->
     let open Coq.Goals in
-    if goals.goals = [] && goals.shelf = [] && goals.given_up = [] then
+    let n_focused = List.length goals.goals in
+    let n_unfocused = count_stack_goals goals.stack in
+    let n_shelved = List.length goals.shelf in
+    let n_given_up = List.length goals.given_up in
+    let n_total = n_focused + n_unfocused + n_shelved + n_given_up in
+    if n_total = 0 then
       "No remaining goals — proof complete!"
     else begin
       let buf = Buffer.create 256 in
+      if n_focused > 0 then
+        Buffer.add_string buf
+          (Printf.sprintf "[Goal 1 of %d | %d unfocused]\n" n_total n_unfocused)
+      else
+        Buffer.add_string buf
+          (Printf.sprintf "[%d unfocused goal(s) remaining, none currently focused]\n"
+             n_unfocused);
       List.iteri
         (fun i g ->
-          Buffer.add_string buf (Printf.sprintf "Goal %d:\n" (i + 1));
+          Buffer.add_string buf
+            (Printf.sprintf "Goal %d/%d:\n" (i + 1) n_focused);
           List.iter
             (fun (h : string Reified_goal.hyp) ->
               let names = String.concat ", " h.names in
@@ -54,14 +72,24 @@ let format_goals (goals_opt : (string, string) Coq.Goals.reified option) =
           Buffer.add_string buf g.Reified_goal.ty;
           Buffer.add_char buf '\n')
         goals.goals;
-      if goals.shelf <> [] then
+      if n_shelved > 0 then
         Buffer.add_string buf
-          (Printf.sprintf "Shelved: %d goal(s)\n" (List.length goals.shelf));
-      if goals.given_up <> [] then
+          (Printf.sprintf "Shelved: %d goal(s)\n" n_shelved);
+      if n_given_up > 0 then
         Buffer.add_string buf
-          (Printf.sprintf "Given up: %d goal(s)\n" (List.length goals.given_up));
+          (Printf.sprintf "Given up: %d goal(s)\n" n_given_up);
       Buffer.contents buf
     end
+
+let goals_are_complete (goals_opt : (string, string) Coq.Goals.reified option) =
+  match goals_opt with
+  | None -> true
+  | Some goals ->
+    let open Coq.Goals in
+    goals.goals = []
+    && count_stack_goals goals.stack = 0
+    && goals.shelf = []
+    && goals.given_up = []
 
 let format_run_result (rr : Agent.State.t Agent.Run_result.t) session_id token
     =
@@ -74,15 +102,21 @@ let format_run_result (rr : Agent.State.t Agent.Run_result.t) session_id token
     if feedback_lines = [] then ""
     else "\nFeedback:\n" ^ String.concat "\n" feedback_lines
   in
+  let goals_result = Agent.goals ~token ~st:rr.st () in
   let goals_text =
-    match Agent.goals ~token ~st:rr.st () with
+    match goals_result with
     | Ok g -> "\n" ^ format_goals g
     | Error e ->
       Printf.sprintf "\n(goals unavailable: %s)"
         (Agent.Error.to_string e.Request.Error.payload)
   in
+  let complete =
+    match goals_result with
+    | Ok g -> goals_are_complete g
+    | Error _ -> rr.proof_finished
+  in
   let proof_status =
-    if rr.proof_finished then "Proof complete!" else "Proof in progress."
+    if complete then "Proof complete!" else "Proof in progress."
   in
   proof_status ^ feedback_text ^ goals_text
 
@@ -271,9 +305,16 @@ let run_tactics ~token ~session_id ~tactics () =
                  i goals_text)
           | Ok rr ->
             Session.set session_id rr.Agent.Run_result.st;
-            if rr.Agent.Run_result.proof_finished then
+            let complete =
+              match Agent.goals ~token ~st:rr.Agent.Run_result.st () with
+              | Ok g -> goals_are_complete g
+              | Error _ -> rr.Agent.Run_result.proof_finished
+            in
+            if complete then
               Ok
-                (Printf.sprintf "Proof complete after tactic %d/%d: %s"
+                (Printf.sprintf
+                   "Proof complete after tactic %d/%d: %s\n\
+                    No remaining goals — proof complete!"
                    (i + 1) total tac)
             else go (i + 1) rest))
   in
