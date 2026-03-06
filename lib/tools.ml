@@ -27,70 +27,6 @@ let build_doc ~token path =
          (Printf.sprintf "Failed to load %s: %s" path
             (Agent.Error.to_string e.Request.Error.payload)))
 
-let count_stack_goals stack =
-  List.fold_left
-    (fun acc (l, r) -> acc + List.length l + List.length r)
-    0 stack
-
-(* Format a goals value into a human-readable string. *)
-let format_goals (goals_opt : (string, string) Coq.Goals.reified option) =
-  match goals_opt with
-  | None -> "No goals — proof may already be complete."
-  | Some goals ->
-    let open Coq.Goals in
-    let n_focused = List.length goals.goals in
-    let n_unfocused = count_stack_goals goals.stack in
-    let n_shelved = List.length goals.shelf in
-    let n_given_up = List.length goals.given_up in
-    let n_total = n_focused + n_unfocused + n_shelved + n_given_up in
-    if n_total = 0 then
-      "No remaining goals — proof complete!"
-    else begin
-      let buf = Buffer.create 256 in
-      if n_focused > 0 then
-        Buffer.add_string buf
-          (Printf.sprintf "[Goal 1 of %d | %d unfocused]\n" n_total n_unfocused)
-      else
-        Buffer.add_string buf
-          (Printf.sprintf "[%d unfocused goal(s) remaining, none currently focused]\n"
-             n_unfocused);
-      List.iteri
-        (fun i g ->
-          Buffer.add_string buf
-            (Printf.sprintf "Goal %d/%d:\n" (i + 1) n_focused);
-          List.iter
-            (fun (h : string Reified_goal.hyp) ->
-              let names = String.concat ", " h.names in
-              (match h.def with
-               | None ->
-                 Buffer.add_string buf (Printf.sprintf "  %s : %s\n" names h.ty)
-               | Some d ->
-                 Buffer.add_string buf
-                   (Printf.sprintf "  %s := %s : %s\n" names d h.ty)))
-            g.Reified_goal.hyps;
-          Buffer.add_string buf "  ⊢ ";
-          Buffer.add_string buf g.Reified_goal.ty;
-          Buffer.add_char buf '\n')
-        goals.goals;
-      if n_shelved > 0 then
-        Buffer.add_string buf
-          (Printf.sprintf "Shelved: %d goal(s)\n" n_shelved);
-      if n_given_up > 0 then
-        Buffer.add_string buf
-          (Printf.sprintf "Given up: %d goal(s)\n" n_given_up);
-      Buffer.contents buf
-    end
-
-let goals_are_complete (goals_opt : (string, string) Coq.Goals.reified option) =
-  match goals_opt with
-  | None -> true
-  | Some goals ->
-    let open Coq.Goals in
-    goals.goals = []
-    && count_stack_goals goals.stack = 0
-    && goals.shelf = []
-    && goals.given_up = []
-
 let format_run_result (rr : Agent.State.t Agent.Run_result.t) session_id token
     =
   let open Agent.Run_result in
@@ -105,14 +41,14 @@ let format_run_result (rr : Agent.State.t Agent.Run_result.t) session_id token
   let goals_result = Agent.goals ~token ~st:rr.st () in
   let goals_text =
     match goals_result with
-    | Ok g -> "\n" ^ format_goals g
+    | Ok g -> "\n" ^ Goal.format g
     | Error e ->
       Printf.sprintf "\n(goals unavailable: %s)"
         (Agent.Error.to_string e.Request.Error.payload)
   in
   let complete =
     match goals_result with
-    | Ok g -> goals_are_complete g
+    | Ok g -> Goal.are_complete g
     | Error _ -> rr.proof_finished
   in
   let proof_status =
@@ -152,7 +88,7 @@ let start_proof ~token ~file_path ~theorem_name ~session_id ?pre_commands () =
      | Ok rr ->
        let goals_text =
          match Agent.goals ~token ~st:rr.Agent.Run_result.st () with
-         | Ok g -> format_goals g
+         | Ok g -> Goal.format g
          | Error _ -> "(goals unavailable)"
        in
        Session.set session_id rr.Agent.Run_result.st;
@@ -188,7 +124,7 @@ let get_goals ~token ~session_id () =
        Error
          (Printf.sprintf "Goals error: %s"
             (Agent.Error.to_string e.Request.Error.payload))
-     | Ok g -> Ok (format_goals g))
+     | Ok g -> Ok (Goal.format g))
 
 (** List available premises for the current proof state. *)
 let get_premises ~token ~session_id () =
@@ -256,7 +192,7 @@ let undo ~token ~session_id ~steps () =
   | Ok (actual, st) ->
     let goals_text =
       match Agent.goals ~token ~st () with
-      | Ok g -> format_goals g
+      | Ok g -> Goal.format g
       | Error _ -> "(goals unavailable)"
     in
     let clamped =
@@ -281,7 +217,7 @@ let run_tactics ~token ~session_id ~tactics () =
        | Ok st ->
          let goals_text =
            match Agent.goals ~token ~st () with
-           | Ok g -> format_goals g
+           | Ok g -> Goal.format g
            | Error _ -> "(goals unavailable)"
          in
          Ok (Printf.sprintf "All %d tactic(s) succeeded.\n%s" total goals_text))
@@ -293,7 +229,7 @@ let run_tactics ~token ~session_id ~tactics () =
           | Error e ->
             let goals_text =
               match Agent.goals ~token ~st () with
-              | Ok g -> format_goals g
+              | Ok g -> Goal.format g
               | Error _ -> "(goals unavailable)"
             in
             Ok
@@ -307,7 +243,7 @@ let run_tactics ~token ~session_id ~tactics () =
             Session.set session_id rr.Agent.Run_result.st;
             let complete =
               match Agent.goals ~token ~st:rr.Agent.Run_result.st () with
-              | Ok g -> goals_are_complete g
+              | Ok g -> Goal.are_complete g
               | Error _ -> rr.Agent.Run_result.proof_finished
             in
             if complete then
