@@ -30,19 +30,22 @@ let undo session_id n =
     Error (Printf.sprintf "No active session '%s'." session_id)
   | Some s ->
     let avail = List.length s.history in
-    let rec drop k hist =
-      if k <= 0 then Some hist
-      else match hist with
-        | [] -> None
-        | _ :: rest -> drop (k - 1) rest
-    in
-    (match drop (n - 1) s.history with
-     | None | Some [] ->
-       Error
-         (Printf.sprintf "Cannot undo %d step(s): only %d in history." n avail)
-     | Some (prev :: rest) ->
-       Hashtbl.replace table session_id { current = prev; history = rest };
-       Ok prev)
+    if avail = 0 then
+      Error "Nothing to undo: no tactics in history."
+    else
+      let n = min n avail in
+      let rec drop k hist =
+        if k <= 0 then hist
+        else match hist with
+          | [] -> []
+          | _ :: rest -> drop (k - 1) rest
+      in
+      match drop (n - 1) s.history with
+      | prev :: rest ->
+        Hashtbl.replace table session_id { current = prev; history = rest };
+        Ok (n, prev)
+      | [] ->
+        Error "Nothing to undo: no tactics in history."
 
 let remove session_id =
   if Hashtbl.mem table session_id then begin

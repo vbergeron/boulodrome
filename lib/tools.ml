@@ -219,13 +219,18 @@ let get_file_toc ~token ~file_path () =
 let undo ~token ~session_id ~steps () =
   match Session.undo session_id steps with
   | Error e -> Error e
-  | Ok st ->
+  | Ok (actual, st) ->
     let goals_text =
       match Agent.goals ~token ~st () with
       | Ok g -> format_goals g
       | Error _ -> "(goals unavailable)"
     in
-    Ok (Printf.sprintf "Undid %d step(s).\n%s" steps goals_text)
+    let clamped =
+      if actual < steps then
+        Printf.sprintf " (requested %d, only %d in history)" steps actual
+      else ""
+    in
+    Ok (Printf.sprintf "Undid %d step(s)%s.\n%s" actual clamped goals_text)
 
 (** Run multiple tactics in sequence; stop at the first failure. *)
 let run_tactics ~token ~session_id ~tactics () =
