@@ -60,7 +60,7 @@ let tool_error text =
 (* Params: single declaration -> schema + decoding                     *)
 (* ------------------------------------------------------------------ *)
 
-type param_type = String | Int
+type param_type = String | Int | Bool
 
 type param =
   { name : string
@@ -73,6 +73,7 @@ let required_string name desc = { name; desc; typ = String; required = true }
 let optional_string name desc = { name; desc; typ = String; required = false }
 let required_int name desc = { name; desc; typ = Int; required = true }
 let optional_int name desc = { name; desc; typ = Int; required = false }
+let optional_bool name desc = { name; desc; typ = Bool; required = false }
 
 type args = (string * Yojson.Safe.t) list
 
@@ -98,6 +99,11 @@ let get_int_opt (args : args) key =
   | Some (`Int i) -> Some i
   | _ -> None
 
+let get_bool_opt (args : args) key =
+  match List.assoc_opt key args with
+  | Some (`Bool b) -> Some b
+  | _ -> None
+
 let ( let* ) = Result.bind
 
 (* ------------------------------------------------------------------ *)
@@ -112,7 +118,7 @@ type tool_def =
   }
 
 let param_to_prop p =
-  let type_str = match p.typ with String -> "string" | Int -> "integer" in
+  let type_str = match p.typ with String -> "string" | Int -> "integer" | Bool -> "boolean" in
   (p.name, `Assoc [ ("type", `String type_str); ("description", `String p.desc) ])
 
 let tool_to_json t =

@@ -27,35 +27,6 @@ let build_doc ~token path =
          (Printf.sprintf "Failed to load %s: %s" path
             (Agent.Error.to_string e.Request.Error.payload)))
 
-let format_run_result (rr : Agent.State.t Agent.Run_result.t) session_id token
-    =
-  let open Agent.Run_result in
-  Session.set session_id rr.st;
-  let feedback_lines =
-    List.map (fun (lvl, msg) -> Printf.sprintf "[level %d] %s" lvl msg) rr.feedback
-  in
-  let feedback_text =
-    if feedback_lines = [] then ""
-    else "\nFeedback:\n" ^ String.concat "\n" feedback_lines
-  in
-  let goals_result = Agent.goals ~token ~st:rr.st () in
-  let goals_text =
-    match goals_result with
-    | Ok g -> "\n" ^ Goal.format g
-    | Error e ->
-      Printf.sprintf "\n(goals unavailable: %s)"
-        (Agent.Error.to_string e.Request.Error.payload)
-  in
-  let complete =
-    match goals_result with
-    | Ok g -> Goal.are_complete g
-    | Error _ -> rr.proof_finished
-  in
-  let proof_status =
-    if complete then "Proof complete!" else "Proof in progress."
-  in
-  proof_status ^ feedback_text ^ goals_text
-
 (* ------------------------------------------------------------------ *)
 (* Tool implementations                                                *)
 (* ------------------------------------------------------------------ *)
@@ -100,19 +71,96 @@ let start_proof ~token ~file_path ~theorem_name ~session_id ?pre_commands () =
        in
        Ok msg)
 
-(** Run a tactic on the current session state. *)
-let run_tactic ~token ~session_id ~tac ?timeout:_ () =
-  match Session.get session_id with
-  | Error e -> Error e
-  | Ok st ->
-    (match Agent.run ~token ~st ~tac () with
-     | Error e ->
-       Error
-         (Printf.sprintf "Tactic failed: %s"
-            (Agent.Error.to_string e.Request.Error.payload))
-     | Ok rr ->
-       let text = format_run_result rr session_id token in
-       Ok (Printf.sprintf "Executed: %s\n%s" tac text))
+(** Run one or more tactics on the current session state.  Tactics are
+    newline-separated; execution stops at the first failure.  When [verbose]
+    is set, the goal state after each successful tactic is included. *)
+let run_tactic ~token ~session_id ~tac ~verbose () =
+  let tac_list =
+    String.split_on_char '\n' tac
+    |> List.map String.trim
+    |> List.filter (fun s -> s <> "")
+  in
+  match tac_list with
+  | [] -> Error "No tactics provided."
+  | _ ->
+    let total = List.length tac_list in
+    let buf = Buffer.create 256 in
+    let rec go i = function
+      | [] ->
+        (match Session.get session_id with
+         | Error e -> Error e
+         | Ok st ->
+           let goals_result = Agent.goals ~token ~st () in
+           let complete =
+             match goals_result with
+             | Ok g -> Goal.are_complete g
+             | Error _ -> false
+           in
+           let status =
+             if complete then "Proof complete!" else "Proof in progress."
+           in
+           Buffer.add_string buf (Printf.sprintf "%s\n" status);
+           (match goals_result with
+            | Ok g -> Buffer.add_string buf (Goal.format g)
+            | Error _ -> Buffer.add_string buf "(goals unavailable)");
+           Ok (Buffer.contents buf))
+      | tac :: rest ->
+        (match Session.get session_id with
+         | Error e -> Error e
+         | Ok st ->
+           (match Agent.run ~token ~st ~tac () with
+            | Error e ->
+              let goals_text =
+                match Agent.goals ~token ~st () with
+                | Ok g -> Goal.format g
+                | Error _ -> "(goals unavailable)"
+              in
+              Buffer.add_string buf
+                (Printf.sprintf "Tactic %d/%d failed: %s\nError: %s\n\
+                                 State is at tactic %d. Current goals:\n%s"
+                   (i + 1) total tac
+                   (Agent.Error.to_string e.Request.Error.payload)
+                   i goals_text);
+              Ok (Buffer.contents buf)
+            | Ok rr ->
+              Session.set session_id rr.Agent.Run_result.st;
+              let goals_result = Agent.goals ~token ~st:rr.Agent.Run_result.st () in
+              let complete =
+                match goals_result with
+                | Ok g -> Goal.are_complete g
+                | Error _ -> rr.Agent.Run_result.proof_finished
+              in
+              let feedback_lines =
+                List.filter_map
+                  (fun (lvl, msg) ->
+                    if lvl > 0 then Some (Printf.sprintf "[level %d] %s" lvl msg)
+                    else None)
+                  rr.Agent.Run_result.feedback
+              in
+              if verbose || total = 1 then begin
+                Buffer.add_string buf
+                  (Printf.sprintf "Executed (%d/%d): %s\n" (i + 1) total tac);
+                List.iter
+                  (fun l -> Buffer.add_string buf (l ^ "\n"))
+                  feedback_lines;
+                (match goals_result with
+                 | Ok g -> Buffer.add_string buf (Goal.format g)
+                 | Error _ -> Buffer.add_string buf "(goals unavailable)");
+                Buffer.add_char buf '\n'
+              end else begin
+                Buffer.add_string buf
+                  (Printf.sprintf "Executed (%d/%d): %s\n" (i + 1) total tac);
+                List.iter
+                  (fun l -> Buffer.add_string buf (l ^ "\n"))
+                  feedback_lines
+              end;
+              if complete then begin
+                Buffer.add_string buf "No remaining goals — proof complete!\n";
+                Ok (Buffer.contents buf)
+              end
+              else go (i + 1) rest))
+    in
+    go 0 tac_list
 
 (** Get current proof goals for a session. *)
 let get_goals ~token ~session_id () =
@@ -201,61 +249,6 @@ let undo ~token ~session_id ~steps () =
       else ""
     in
     Ok (Printf.sprintf "Undid %d step(s)%s.\n%s" actual clamped goals_text)
-
-(** Run multiple tactics in sequence; stop at the first failure. *)
-let run_tactics ~token ~session_id ~tactics () =
-  let tac_list =
-    String.split_on_char '\n' tactics
-    |> List.map String.trim
-    |> List.filter (fun s -> s <> "")
-  in
-  let total = List.length tac_list in
-  let rec go i = function
-    | [] ->
-      (match Session.get session_id with
-       | Error e -> Error e
-       | Ok st ->
-         let goals_text =
-           match Agent.goals ~token ~st () with
-           | Ok g -> Goal.format g
-           | Error _ -> "(goals unavailable)"
-         in
-         Ok (Printf.sprintf "All %d tactic(s) succeeded.\n%s" total goals_text))
-    | tac :: rest ->
-      (match Session.get session_id with
-       | Error e -> Error e
-       | Ok st ->
-         (match Agent.run ~token ~st ~tac () with
-          | Error e ->
-            let goals_text =
-              match Agent.goals ~token ~st () with
-              | Ok g -> Goal.format g
-              | Error _ -> "(goals unavailable)"
-            in
-            Ok
-              (Printf.sprintf
-                 "Tactic %d/%d failed: %s\nError: %s\n\
-                  State is at tactic %d. Current goals:\n%s"
-                 (i + 1) total tac
-                 (Agent.Error.to_string e.Request.Error.payload)
-                 i goals_text)
-          | Ok rr ->
-            Session.set session_id rr.Agent.Run_result.st;
-            let complete =
-              match Agent.goals ~token ~st:rr.Agent.Run_result.st () with
-              | Ok g -> Goal.are_complete g
-              | Error _ -> rr.Agent.Run_result.proof_finished
-            in
-            if complete then
-              Ok
-                (Printf.sprintf
-                   "Proof complete after tactic %d/%d: %s\n\
-                    No remaining goals — proof complete!"
-                   (i + 1) total tac)
-            else go (i + 1) rest))
-  in
-  if tac_list = [] then Error "No tactics provided."
-  else go 0 tac_list
 
 (** Search for theorems/definitions matching [query] in the current context. *)
 let search ~token ~session_id ~query () =

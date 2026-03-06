@@ -26,18 +26,27 @@ let start_proof ~token : tool_def =
 
 let run_tactic ~token : tool_def =
   { name = "rocq_run_tactic"
-  ; description = "Execute a tactic or command on the current proof state"
+  ; description =
+      "Execute one or more tactics on the current proof state. Multiple \
+       tactics can be provided as newline-separated lines; execution stops \
+       at the first failure. Set verbose to true to see the goal state \
+       after each tactic (useful for debugging multi-step sequences)."
   ; params =
       [ required_string "session_id" "Session identifier"
       ; required_string "tac"
-          "Tactic or command to execute (e.g. 'induction n.', 'auto.')"
-      ; optional_int "timeout" "Optional timeout in seconds"
+          "Tactic(s) to execute (e.g. 'induction n.' or multiple \
+           newline-separated tactics)"
+      ; optional_bool "verbose"
+          "If true, show goal state after each tactic (default: false)"
       ]
   ; handler =
       (fun args ->
         let* session_id = get_string args "session_id" in
         let* tac = get_string args "tac" in
-        Tools.run_tactic ~token ~session_id ~tac ())
+        let verbose =
+          match get_bool_opt args "verbose" with Some b -> b | None -> false
+        in
+        Tools.run_tactic ~token ~session_id ~tac ~verbose ())
   }
 
 let get_goals ~token : tool_def =
@@ -109,24 +118,6 @@ let undo ~token : tool_def =
         Tools.undo ~token ~session_id ~steps ())
   }
 
-let run_tactics ~token : tool_def =
-  { name = "rocq_run_tactics"
-  ; description =
-      "Run multiple tactics in sequence, stopping at the first failure. On \
-       failure, the proof state stays at the last successful tactic and the \
-       response reports which tactic failed. Tactics are newline-separated."
-  ; params =
-      [ required_string "session_id" "Session identifier"
-      ; required_string "tactics"
-          "Newline-separated list of tactics to execute in order"
-      ]
-  ; handler =
-      (fun args ->
-        let* session_id = get_string args "session_id" in
-        let* tactics = get_string args "tactics" in
-        Tools.run_tactics ~token ~session_id ~tactics ())
-  }
-
 let end_session : tool_def =
   { name = "rocq_end_session"
   ; description = "Close a proof session and free its state"
@@ -143,7 +134,6 @@ let config ~token : Mcp.config =
   ; tools =
       [ start_proof ~token
       ; run_tactic ~token
-      ; run_tactics ~token
       ; undo ~token
       ; get_goals ~token
       ; get_premises ~token
