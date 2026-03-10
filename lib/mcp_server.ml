@@ -164,7 +164,7 @@ let end_session : tool_def =
 
 let config ~token : Mcp.config =
   { name = "boulodrome"
-  ; version = "0.2.0"
+  ; version = "0.3.0"
   ; tools =
       [ start_proof ~token
       ; run_tactics ~token
