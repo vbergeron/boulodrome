@@ -2,7 +2,7 @@ open Petanque
 
 let run ~token ~session_id () =
   match Session.get session_id with
-  | Error e -> Error e
+  | Error e -> Error (Session.error_to_string e)
   | Ok st ->
     (match Agent.goals ~token ~st () with
      | Error e ->
@@ -13,7 +13,7 @@ let run ~token ~session_id () =
 
 let premises ~token ~session_id () =
   match Session.get session_id with
-  | Error e -> Error e
+  | Error e -> Error (Session.error_to_string e)
   | Ok st ->
     (match Agent.premises ~token ~st with
      | Error e ->

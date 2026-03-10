@@ -33,7 +33,7 @@ let root_state ~token fp =
             (Agent.Error.to_string e.Request.Error.payload)))
 
 let get_state ~token = function
-  | Session sid -> Session.get sid
+  | Session sid -> Result.map_error Session.error_to_string (Session.get sid)
   | File fp -> root_state ~token fp
 
 let run ~token ~source ~query ~kind ?max_results () =

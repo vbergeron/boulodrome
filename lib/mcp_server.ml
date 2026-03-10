@@ -44,7 +44,31 @@ let run_tactics ~token : tool_def =
         let verbose =
           match get_bool_opt args "verbose" with Some b -> b | None -> false
         in
-        Run_tactics.run ~token ~session_id ~tac_list ~verbose ())
+        Tactics.run ~token ~session_id ~tac_list ~verbose ())
+  }
+
+let try_tactics ~token : tool_def =
+  { name = "rocq_try_tactics"
+  ; description =
+      "Try each tactic independently on the current proof state WITHOUT \
+       modifying the session. Every tactic in the list is run from the same \
+       starting state, so you can compare alternatives even if some fail. \
+       Use rocq_run_tactics to commit the chosen tactic."
+  ; params =
+      [ required_string "session_id" "Session identifier"
+      ; required_string_array "tac_list"
+          "Tactic(s) to try, e.g. [\"induction n.\", \"simpl.\", \"auto.\"]"
+      ; optional_bool "verbose"
+          "If true, show goal state after each tactic (default: false)"
+      ]
+  ; handler =
+      (fun args ->
+        let* session_id = get_string args "session_id" in
+        let* tac_list = get_string_list args "tac_list" in
+        let verbose =
+          match get_bool_opt args "verbose" with Some b -> b | None -> false
+        in
+        Tactics.try_run ~token ~session_id ~tac_list ~verbose ())
   }
 
 let get_goals ~token : tool_def =
@@ -149,7 +173,8 @@ let undo ~token : tool_def =
         let steps =
           match get_int_opt args "steps" with Some n -> n | None -> 1
         in
-        Undo.run ~token ~session_id ~steps ())
+        Undo.run ~token ~session_id ~steps ()
+        |> Result.map_error Session.error_to_string)
   }
 
 let end_session : tool_def =
@@ -159,7 +184,8 @@ let end_session : tool_def =
   ; handler =
       (fun args ->
         let* session_id = get_string args "session_id" in
-        Session.remove session_id)
+        Session.remove session_id
+        |> Result.map_error Session.error_to_string)
   }
 
 let config ~token : Mcp.config =
@@ -168,6 +194,7 @@ let config ~token : Mcp.config =
   ; tools =
       [ start_proof ~token
       ; run_tactics ~token
+      ; try_tactics ~token
       ; undo ~token
       ; get_goals ~token
       ; get_premises ~token

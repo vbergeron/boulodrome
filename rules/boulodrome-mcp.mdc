@@ -1,0 +1,56 @@
+---
+description: Use the boulodrome MCP for interactive Rocq proof development
+globs: **/*.v
+alwaysApply: false
+---
+
+# Interactive proofs with boulodrome MCP
+
+When the boulodrome MCP tools (`rocq_*`) are available, use them for all tactical proof work. **Never guess an entire proof script in one shot.** Interact with the proof state step by step.
+
+## Starting a proof
+
+1. Make sure the file builds (`dune build`) before starting a session — the MCP operates on compiled dependencies.
+2. Use `rocq_get_file_toc` to discover theorem names in the file before starting.
+3. Call `rocq_start_proof` with the file path, theorem name, and a session id. Use `pre_commands` if the proof needs imports beyond what the file provides (e.g. `"From Stdlib Require Import Lia."`).
+4. The initial goal is returned by `rocq_start_proof`; no need to call `rocq_get_goals` separately.
+
+## Developing the proof
+
+Work **one tactic at a time** (or a small batch):
+
+- Run tactics via `rocq_run_tactics` with a `tac_list` array, e.g. `["induction n.", "simpl.", "auto."]`. Execution stops at the first failure and the session state is advanced up to that point.
+- Pass `verbose: true` to see intermediate goal states in a multi-tactic batch.
+- If a tactic fails, **read the error**, undo if needed (`rocq_undo`), and try a different approach.
+
+## Exploring alternatives with `rocq_try_tactics`
+
+Use `rocq_try_tactics` to test several candidate tactics **without modifying the session**. Every tactic in the list is run independently from the same starting state, so you can compare outcomes even if some fail.
+
+- Good for choosing between `induction`, `destruct`, `inversion`, solvers, etc.
+- After reviewing the results, call `rocq_run_tactics` with the chosen tactic to commit it.
+- Prefer `rocq_try_tactics` over a trial-and-error loop of `rocq_run_tactics` + `rocq_undo`.
+
+## Discovering lemmas
+
+- Use `rocq_get_premises` to see lemmas and definitions in scope for the current proof state.
+- Use `rocq_search` to query the Rocq library. Pass `kind` as `"search"` (default), `"search_pattern"` (conclusion shape only), or `"search_rewrite"` (rewrite lemmas matching a pattern). You can search inside a proof session (`session_id`) or from a file's root context (`file_path`).
+- Useful query patterns: `(_ + _ = _ + _)` for type patterns, `"assoc"` for name substrings, `concl:(nat -> bool)` for conclusion shape, `is:Lemma` for kind filters.
+- **Never guess lemma names.** Search first.
+
+## Key discipline: stay interactive
+
+- **Do not** write more than 3-4 tactics without checking the goal state.
+- **Do not** speculate about what the goal "should" look like — call `rocq_get_goals`.
+- **Do not** retry the same failing tactic with minor variations in a loop. If two attempts fail, step back: undo to a known-good state, inspect goals/premises, and reconsider the approach.
+- When in need of a new helper lemma, **do not** close the session. Open a new one alongside it.
+- When you figure out a cleaner demonstration, **do not** close the session. Open a new one. Close the old session **only after** the new strategy is proven successful.
+
+## Writing the proof to the file
+
+Only write the proof script into the `.v` file **after** the session reports proof completion with zero remaining goals (focused, unfocused, shelved, and given-up). Copy the successful tactic sequence verbatim. Then `dune build` to confirm.
+
+## Cleanup
+
+Call `rocq_end_session` when the proof is complete or abandoned.
+Write the progress so far using `admit.` and `Admitted.` to gracefully finish incomplete proofs.

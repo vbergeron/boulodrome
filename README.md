@@ -178,55 +178,13 @@ The MCP client (your IDE or agent) connects over stdio. File paths passed to too
 
 ## Cursor / Claude configuration
 
-Boulodrome is configured as an MCP server in your editor or agent. Below is an example rule file to drop into your Rocq project.
+Boulodrome is configured as an MCP server in your editor or agent. A ready-made rule file is provided in [`rules/boulodrome-mcp.mdc`](rules/boulodrome-mcp.mdc). Copy it into your Rocq project's `.cursor/rules/` directory (or the equivalent rules directory for your editor):
 
-### Example `boulodrome-mcp.mdc`
-
-```markdown
----
-description: Rules for using boulodrome to assist with Rocq proofs
-globs: ["**/*.v"]
-alwaysApply: false
----
-
-# Rocq proof assistant via boulodrome
-
-You have access to the boulodrome MCP server, which lets you interact with the
-Rocq proof assistant directly. Use these tools when the user asks you to prove
-theorems or debug proofs in `.v` files.
-
-## Workflow
-
-1. Use `rocq_get_file_toc` to list theorems in a file before starting.
-2. Use `rocq_start_proof` with a unique `session_id` to open a proof session.
-3. Inspect the initial goal with `rocq_get_goals` or by reading the output of
-   `rocq_start_proof`.
-4. Use `rocq_search` or `rocq_get_premises` to find relevant lemmas.
-   `rocq_search` accepts full Rocq search syntax: patterns like
-   `(_ + _ = _ + _)`, name substrings like `"assoc"`, qualifiers like
-   `concl:` or `hyp:`, negation with `-`, and kind filters like
-   `is:Lemma`. You can also search without a session by passing
-   `file_path` instead of `session_id`.
-5. Run tactics with `rocq_run_tactics`. Use `verbose: true` when you are
-   uncertain about intermediate states.
-6. Use `rocq_undo` to backtrack if a tactic sequence leads to a dead end.
-7. Close the session with `rocq_end_session` when the proof is complete or
-   abandoned.
-
-## Guidelines
-
-- Choose `session_id` values that are descriptive and unique, e.g.
-  `"plus_comm_attempt_1"`.
-- Prefer small `tac_list` batches (2–4 tactics) so failures are easy to
-  pinpoint.
-- After `rocq_undo`, re-read the goals before trying a new approach.
-- If `rocq_start_proof` fails with a document error, check that `file_path`
-  is absolute and that the file compiles in isolation.
-- Use `rocq_search` with patterns to find relevant lemmas. Set `kind` to
-  `"search_pattern"` or `"search_rewrite"` for more targeted searches.
+```bash
+cp rules/boulodrome-mcp.mdc /path/to/your/rocq/project/.cursor/rules/
 ```
 
-Save this file as `boulodrome-mcp.mdc` in `.cursor/rules/` (for Cursor) or the equivalent rules directory for your editor. The MCP server itself is registered in your editor's MCP settings:
+The MCP server itself is registered in your editor's MCP settings:
 
 **Cursor** (`~/.cursor/mcp.json` or the project-level `.cursor/mcp.json`):
 
