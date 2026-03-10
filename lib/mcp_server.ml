@@ -84,18 +84,54 @@ let get_file_toc ~token : tool_def =
 let search ~token : tool_def =
   { name = "rocq_search"
   ; description =
-      "Search for theorems, definitions, and other objects in the current \
-       context"
+      "Search for theorems, definitions, and other objects using Rocq's \
+       Search command. The query is passed verbatim as the argument to the \
+       Rocq Search/SearchPattern/SearchRewrite command.\n\n\
+       Query syntax (for kind=\"search\", the default):\n\
+       - Pattern: (_ + _ = _ + _)  -- type pattern with holes _ or ?n\n\
+       - Name substring: \"assoc\"  -- quoted string, matches object names\n\
+       - Notation: \"+\"  -- quoted, finds objects whose type uses this notation\n\
+       - Qualifiers: hyp: concl: head: headhyp: headconcl: before a pattern \
+       or string\n\
+       - Negation: - query  -- exclude matching objects\n\
+       - Kind filter: is:Lemma, is:Definition, is:Instance, is:Fixpoint, etc.\n\
+       - Scope: ... inside ModuleName  or  ... outside ModuleName\n\
+       - Disjunction: [ query1 | query2 ]\n\n\
+       Examples:\n\
+       - \"plus_comm\" -- find by name\n\
+       - (_ + _ = _ + _) -- commutativity lemmas\n\
+       - \"assoc\" -- all names containing assoc\n\
+       - concl:(nat -> bool) -- functions returning bool in conclusion\n\
+       - (_ * _ = _ * _) -\"trivial\" -- pattern, excluding names with trivial\n\
+       - [ is:Lemma (_ + _) | is:Definition headconcl:nat ] -- disjunction\n\n\
+       For kind=\"search_pattern\": matches the conclusion shape only.\n\
+       For kind=\"search_rewrite\": finds rewrite lemmas where one side of an \
+       equality matches the pattern.\n\n\
+       Provide either session_id (to search in a proof context) or file_path \
+       (to search from a file's root context). session_id takes precedence."
   ; params =
-      [ required_string "session_id" "Session identifier"
+      [ optional_string "session_id"
+          "Session identifier (provide this or file_path)"
+      ; optional_string "file_path"
+          "Absolute path to a .v file (alternative to session_id)"
       ; required_string "query"
-          "Search query (e.g. 'plus_comm', 'nat -> nat')"
+          "Rocq search expression, passed verbatim (see description for syntax)"
+      ; required_string "kind"
+          "Search command: \"search\", \"search_pattern\", or \
+           \"search_rewrite\""
+      ; optional_int "max_results"
+          "Maximum number of results to return (default: 30)"
       ]
   ; handler =
       (fun args ->
-        let* session_id = get_string args "session_id" in
+        let session_id = get_string_opt args "session_id" in
+        let file_path = get_string_opt args "file_path" in
+        let* source = Search.source_of_args ~session_id ~file_path in
         let* query = get_string args "query" in
-        Search.run ~token ~session_id ~query ())
+        let* kind = get_string args "kind" in
+        let* kind = Search.kind_of_string kind in
+        let max_results = get_int_opt args "max_results" in
+        Search.run ~token ~source ~query ~kind ?max_results ())
   }
 
 let undo ~token : tool_def =

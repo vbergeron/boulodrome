@@ -75,14 +75,42 @@ Use this to discover what theorems are available before starting a session.
 
 ### `rocq_search`
 
-Searches for theorems, definitions, and other objects matching a query in the current proof context.
+Searches for theorems, definitions, and other objects using Rocq's `Search`, `SearchPattern`, or `SearchRewrite` commands. The `query` is passed verbatim as the argument to the chosen command.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `session_id` | string | yes | Session whose context to search in |
-| `query` | string | yes | Name pattern or type expression, e.g. `plus_comm` or `nat -> nat` |
+| `session_id` | string | no | Session whose context to search in (provide this or `file_path`) |
+| `file_path` | string | no | Absolute path to a `.v` file (alternative to `session_id`) |
+| `query` | string | yes | Rocq search expression, passed verbatim (see syntax below) |
+| `kind` | string | no | `"search"` (default), `"search_pattern"`, or `"search_rewrite"` |
+| `max_results` | int | no | Maximum number of results (default: 30) |
 
-Returns up to 50 results. Requires an active session because the search scope depends on what is loaded.
+Provide either `session_id` (to search in a proof context) or `file_path` (to search from a file's root context). `session_id` takes precedence.
+
+#### Query syntax (for `kind="search"`)
+
+- **Pattern**: `(_ + _ = _ + _)` — type pattern with holes `_` or named metavariables `?n`
+- **Name substring**: `"assoc"` — quoted string, matches object names containing the substring
+- **Notation**: `"+"` — quoted, finds objects whose type uses this notation
+- **Qualifiers**: `hyp:`, `concl:`, `head:`, `headhyp:`, `headconcl:` before a pattern or string
+- **Negation**: `- query` — exclude matching objects
+- **Kind filter**: `is:Lemma`, `is:Definition`, `is:Instance`, `is:Fixpoint`, etc.
+- **Scope**: `... inside ModuleName` or `... outside ModuleName`
+- **Disjunction**: `[ query1 | query2 ]`
+
+#### Examples
+
+| Query | Finds |
+|-------|-------|
+| `plus_comm` | Objects matching `plus_comm` |
+| `(_ + _ = _ + _)` | Commutativity lemmas |
+| `"assoc"` | All names containing "assoc" |
+| `concl:(nat -> bool)` | Functions returning `bool` in the conclusion |
+| `is:Lemma (_ + _)` | Lemmas about addition |
+| `(_ * _) -"trivial"` | Multiplication results, excluding names with "trivial" |
+
+For `kind="search_pattern"`: matches the conclusion shape only (not subterms).
+For `kind="search_rewrite"`: finds rewrite lemmas where one side of an equality matches the pattern.
 
 ---
 
@@ -174,6 +202,11 @@ theorems or debug proofs in `.v` files.
 3. Inspect the initial goal with `rocq_get_goals` or by reading the output of
    `rocq_start_proof`.
 4. Use `rocq_search` or `rocq_get_premises` to find relevant lemmas.
+   `rocq_search` accepts full Rocq search syntax: patterns like
+   `(_ + _ = _ + _)`, name substrings like `"assoc"`, qualifiers like
+   `concl:` or `hyp:`, negation with `-`, and kind filters like
+   `is:Lemma`. You can also search without a session by passing
+   `file_path` instead of `session_id`.
 5. Run tactics with `rocq_run_tactics`. Use `verbose: true` when you are
    uncertain about intermediate states.
 6. Use `rocq_undo` to backtrack if a tactic sequence leads to a dead end.
@@ -189,7 +222,8 @@ theorems or debug proofs in `.v` files.
 - After `rocq_undo`, re-read the goals before trying a new approach.
 - If `rocq_start_proof` fails with a document error, check that `file_path`
   is absolute and that the file compiles in isolation.
-- `rocq_search` needs an active session; open one before searching.
+- Use `rocq_search` with patterns to find relevant lemmas. Set `kind` to
+  `"search_pattern"` or `"search_rewrite"` for more targeted searches.
 ```
 
 Save this file as `boulodrome-mcp.mdc` in `.cursor/rules/` (for Cursor) or the equivalent rules directory for your editor. The MCP server itself is registered in your editor's MCP settings:

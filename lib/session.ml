@@ -5,7 +5,6 @@ type session_state =
   ; history : Agent.State.t list
   }
 
-(** Active sessions: map session_id -> current proof state + undo history *)
 let table : (string, session_state) Hashtbl.t = Hashtbl.create 16
 
 let get session_id =
