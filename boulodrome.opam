@@ -2,6 +2,12 @@ opam-version: "2.0"
 name: "boulodrome"
 version: "0.4.0"
 synopsis: "MCP server for Rocq/Coq proof assistance via Petanque"
+maintainer: "Valentin Bergeron <dev.vbergeron@gmail.com>"
+authors: ["Valentin Bergeron <dev.vbergeron@gmail.com>"]
+homepage: "https://github.com/vbergeron/boulodrome"
+bug-reports: "https://github.com/vbergeron/boulodrome/issues"
+dev-repo: "git+https://github.com/vbergeron/boulodrome.git"
+license: "Apache-2.0"
 depends: [
   "ocaml" {>= "5.2.1"}
   "dune" {>= "3.21"}
