@@ -23,15 +23,20 @@ jobs:
 
       - run: opam exec -- dune build
 
-      - name: Install dune-release
-        run: opam install dune-release
+      - name: Install release tools
+        run: opam install dune-release opam-publish
 
-      - name: Publish to opam-repository
+      - name: Create distribution and GitHub release
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           opam exec -- dune-release distrib
           opam exec -- dune-release publish --yes
-          opam exec -- dune-release opam submit --yes
         env:
           DUNE_RELEASE_GITHUB_TOKEN: ${{ secrets.DUNE_RELEASE_GITHUB_TOKEN }}
+
+      - name: Submit to opam-repository
+        run: |
+          opam exec -- opam publish --tag="${GITHUB_REF_NAME}"
+        env:
+          OPAM_PUBLISH_GH_TOKEN: ${{ secrets.DUNE_RELEASE_GITHUB_TOKEN }}
