@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 (2026-04-14)
+
+- Add `rocq_inspect` tool for inspecting terms with `Check`, `Print`, `About`, and `Locate`
+- Add `rocq_diagnostics` tool for retrieving file diagnostics with optional severity filtering
+- Rename `rocq_get_file_toc` to `rocq_file_toc`, `rocq_get_goals` to `rocq_goals`, `rocq_get_premises` to `rocq_premises`
+- Enhance `rocq_file_toc` output with declaration kind, line numbers, children (record fields, constructors), and full statement text
+
 ## 0.4.1 (2026-04-14)
 
 - Update README with `rocq_try_tactics` documentation and fix `rocq_search` `kind` parameter (required, not optional)

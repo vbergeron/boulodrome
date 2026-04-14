@@ -72,7 +72,7 @@ let try_tactics ~token : tool_def =
   }
 
 let get_goals ~token : tool_def =
-  { name = "rocq_get_goals"
+  { name = "rocq_goals"
   ; description = "Get the current proof goals for a session"
   ; params = [ required_string "session_id" "Session identifier" ]
   ; handler =
@@ -82,7 +82,7 @@ let get_goals ~token : tool_def =
   }
 
 let get_premises ~token : tool_def =
-  { name = "rocq_get_premises"
+  { name = "rocq_premises"
   ; description =
       "Get available premises (lemmas, definitions) for the current proof \
        state"
@@ -94,7 +94,7 @@ let get_premises ~token : tool_def =
   }
 
 let get_file_toc ~token : tool_def =
-  { name = "rocq_get_file_toc"
+  { name = "rocq_file_toc"
   ; description =
       "Get table of contents (definitions and theorems) for a Coq/Rocq file"
   ; params =
@@ -103,6 +103,29 @@ let get_file_toc ~token : tool_def =
       (fun args ->
         let* file_path = get_string args "file_path" in
         Get_file_toc.run ~token ~file_path ())
+  }
+
+let diagnostics ~token : tool_def =
+  { name = "rocq_diagnostics"
+  ; description =
+      "Get all diagnostic messages (errors, warnings, etc.) for a Coq/Rocq \
+       file. Use the optional severity parameter to filter to a single level."
+  ; params =
+      [ required_string "file_path" "Absolute path to the Coq/Rocq file"
+      ; optional_string "severity"
+          "Filter by severity: \"error\", \"warning\", \"information\", or \
+           \"hint\". If omitted, all diagnostics are returned."
+      ]
+  ; handler =
+      (fun args ->
+        let* file_path = get_string args "file_path" in
+        let sev_str = get_string_opt args "severity" in
+        let* severity =
+          match sev_str with
+          | None -> Ok None
+          | Some s -> Diagnostics.severity_of_string s
+        in
+        Diagnostics.run ~token ~file_path ?severity ())
   }
 
 let search ~token : tool_def =
@@ -158,6 +181,40 @@ let search ~token : tool_def =
         Search.run ~token ~source ~query ~kind ?max_results ())
   }
 
+let inspect ~token : tool_def =
+  { name = "rocq_inspect"
+  ; description =
+      "Inspect a Rocq term or object using Check, Print, About, or Locate. \
+       Returns type signatures, full definitions, documentation, or location \
+       information.\n\n\
+       Commands:\n\
+       - \"check\": show the type of a term (e.g. \"Nat.add\")\n\
+       - \"print\": show the full definition of an object\n\
+       - \"about\": show information including implicit arguments and scopes\n\
+       - \"locate\": show the full qualified name and module of an identifier\n\n\
+       Provide either session_id (to inspect in a proof context) or file_path \
+       (to inspect from a file's root context). session_id takes precedence."
+  ; params =
+      [ optional_string "session_id"
+          "Session identifier (provide this or file_path)"
+      ; optional_string "file_path"
+          "Absolute path to a .v file (alternative to session_id)"
+      ; required_string "command"
+          "Inspection command: \"check\", \"print\", \"about\", or \"locate\""
+      ; required_string "term"
+          "The term, definition, or identifier to inspect"
+      ]
+  ; handler =
+      (fun args ->
+        let session_id = get_string_opt args "session_id" in
+        let file_path = get_string_opt args "file_path" in
+        let* source = Search.source_of_args ~session_id ~file_path in
+        let* command = get_string args "command" in
+        let* command = Inspect.kind_of_string command in
+        let* term = get_string args "term" in
+        Inspect.run ~token ~source ~command ~term ())
+  }
+
 let undo ~token : tool_def =
   { name = "rocq_undo"
   ; description =
@@ -190,7 +247,7 @@ let end_session : tool_def =
 
 let config ~token : Mcp.config =
   { name = "boulodrome"
-  ; version = "0.4.0"
+  ; version = "0.5.0"
   ; tools =
       [ start_proof ~token
       ; run_tactics ~token
@@ -199,7 +256,9 @@ let config ~token : Mcp.config =
       ; get_goals ~token
       ; get_premises ~token
       ; get_file_toc ~token
+      ; diagnostics ~token
       ; search ~token
+      ; inspect ~token
       ; end_session
       ]
   }

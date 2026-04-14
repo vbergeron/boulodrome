@@ -49,7 +49,7 @@ Tries each tactic independently on the current proof state **without modifying t
 
 ---
 
-### `rocq_get_goals`
+### `rocq_goals`
 
 Returns the current goal state for a session.
 
@@ -61,7 +61,7 @@ Returns focused goals, hypotheses, and any unfocused or shelved goals.
 
 ---
 
-### `rocq_get_premises`
+### `rocq_premises`
 
 Returns up to 20 premises (lemmas and definitions) available in the current proof context.
 
@@ -73,15 +73,41 @@ Useful for discovering what lemmas are in scope before deciding which tactic to 
 
 ---
 
-### `rocq_get_file_toc`
+### `rocq_file_toc`
 
-Returns the table of contents of a `.v` file: all definitions and theorems with their positions.
+Returns the table of contents of a `.v` file: all definitions and theorems with their kind, line number, and structural details.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `file_path` | string | yes | Absolute path to the `.v` file |
 
+Each entry shows the declaration kind, line number, and full statement. For example:
+
+```
+- [Inductive] nat { O, S } (line 5)
+    Inductive nat : Set :=  O : nat | S : nat -> nat.
+- [Theorem] plus_comm (line 12)
+    Theorem plus_comm : forall n m : nat, n + m = m + n.
+- [Definition] double (line 20)
+    Definition double := fun n : nat => n + n.
+- [Record] point { x, y } (line 25)
+    Record point : Set := mk_point { x : nat; y : nat }.
+```
+
 Use this to discover what theorems are available before starting a session.
+
+---
+
+### `rocq_diagnostics`
+
+Returns all diagnostic messages (errors, warnings, information, hints) for a `.v` file. Use the optional `severity` parameter to filter to a single level.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `file_path` | string | yes | Absolute path to the `.v` file |
+| `severity` | string | no | Filter by severity: `"error"`, `"warning"`, `"information"`, or `"hint"`. If omitted, all diagnostics are returned. |
+
+Each diagnostic is formatted as `l<line>c<col>-l<line>c<col>, <severity>: <message>`.
 
 ---
 
@@ -123,6 +149,30 @@ Provide either `session_id` (to search in a proof context) or `file_path` (to se
 
 For `kind="search_pattern"`: matches the conclusion shape only (not subterms).
 For `kind="search_rewrite"`: finds rewrite lemmas where one side of an equality matches the pattern.
+
+---
+
+### `rocq_inspect`
+
+Inspect a Rocq term or object using `Check`, `Print`, `About`, or `Locate`. Returns type signatures, full definitions, documentation, or location information.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `session_id` | string | no | Session whose context to inspect in (provide this or `file_path`) |
+| `file_path` | string | no | Absolute path to a `.v` file (alternative to `session_id`) |
+| `command` | string | yes | `"check"`, `"print"`, `"about"`, or `"locate"` |
+| `term` | string | yes | The term, definition, or identifier to inspect |
+
+Provide either `session_id` (to inspect in a proof context) or `file_path` (to inspect from a file's root context). `session_id` takes precedence.
+
+#### Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `check` | Show the type of a term | `Nat.add` → `Nat.add : nat -> nat -> nat` |
+| `print` | Show the full definition of an object | `Nat.add` → recursive definition body |
+| `about` | Show info including implicit arguments and scopes | `Nat.add` → argument details, notations |
+| `locate` | Show the full qualified name and module | `Nat.add` → `Coq.Init.Nat.add` |
 
 ---
 

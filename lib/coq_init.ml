@@ -88,10 +88,19 @@ let build_doc ~token ~uri =
 
 module SM = Lang.Compat.String.Map
 
-let toc_to_info (name, node) =
+type toc_entry =
+  { info : Lang.Ast.Info.t list option
+  ; statement : string option
+  }
+
+let toc_to_entry (name, node) =
   let open Coq.Compat.Option.O in
   let+ ast = Fleche.Doc.Node.ast node in
-  (name, ast.Fleche.Doc.Node.Ast.ast_info)
+  let info = ast.Fleche.Doc.Node.Ast.ast_info in
+  let statement =
+    Some (Format.asprintf "%a" Pp.pp_with (Coq.Ast.print ast.v))
+  in
+  (name, { info; statement })
 
 let doc_errors (doc : Fleche.Doc.t) =
   Fleche.Doc.diags doc
@@ -100,7 +109,7 @@ let doc_errors (doc : Fleche.Doc.t) =
     Format.asprintf "%a" Pp.pp_with d.Lang.Diagnostic.message)
 
 let get_toc ~token:_ ~(doc : Fleche.Doc.t) :
-    (string * Lang.Ast.Info.t list option) list Petanque.Agent.R.t =
+    (string * toc_entry) list Petanque.Agent.R.t =
   let { Fleche.Doc.toc; _ } = doc in
-  let toc = SM.bindings toc |> List.filter_map toc_to_info in
+  let toc = SM.bindings toc |> List.filter_map toc_to_entry in
   Ok toc
