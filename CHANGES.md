@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 (2026-04-14)
+
+- Update README with `rocq_try_tactics` documentation and fix `rocq_search` `kind` parameter (required, not optional)
+
 ## 0.4.0 (2026-03-19)
 
 - Add `rocq_try_tactics` tool for speculative tactic exploration
