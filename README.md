@@ -37,6 +37,18 @@ Returns the output of each tactic. If a tactic fails, the proof state is not adv
 
 ---
 
+### `rocq_try_tactics`
+
+Tries each tactic independently on the current proof state **without modifying the session**. Every tactic in the list is run from the same starting state, so you can compare alternatives even if some fail. Use `rocq_run_tactics` to commit the chosen tactic.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `session_id` | string | yes | Session to try tactics in |
+| `tac_list` | string[] | yes | Tactics to try, e.g. `["induction n.", "simpl.", "auto."]` |
+| `verbose` | bool | no | If true, show the goal state after each tactic (default: false) |
+
+---
+
 ### `rocq_get_goals`
 
 Returns the current goal state for a session.
@@ -82,7 +94,7 @@ Searches for theorems, definitions, and other objects using Rocq's `Search`, `Se
 | `session_id` | string | no | Session whose context to search in (provide this or `file_path`) |
 | `file_path` | string | no | Absolute path to a `.v` file (alternative to `session_id`) |
 | `query` | string | yes | Rocq search expression, passed verbatim (see syntax below) |
-| `kind` | string | no | `"search"` (default), `"search_pattern"`, or `"search_rewrite"` |
+| `kind` | string | yes | `"search"`, `"search_pattern"`, or `"search_rewrite"` |
 | `max_results` | int | no | Maximum number of results (default: 30) |
 
 Provide either `session_id` (to search in a proof context) or `file_path` (to search from a file's root context). `session_id` takes precedence.
@@ -211,3 +223,13 @@ The MCP server itself is registered in your editor's MCP settings:
   }
 }
 ```
+
+---
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE).
+
+## Changelog
+
+See [CHANGES.md](CHANGES.md) for the full release history.
