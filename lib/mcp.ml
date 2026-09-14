@@ -1,7 +1,13 @@
-(** Generic MCP server: JSON-RPC 2.0 over stdio with Content-Length framing. *)
+(** Generic MCP server: JSON-RPC 2.0 over stdio with NDJSON framing. *)
 
 (* ------------------------------------------------------------------ *)
-(* I/O framing (same as LSP)                                           *)
+(* I/O framing                                                         *)
+(*                                                                     *)
+(* Messages are written one JSON object per line (NDJSON), which is    *)
+(* what the MCP stdio transport specifies. Content-Length-framed input *)
+(* (LSP-style) is also accepted for leniency, but outgoing messages    *)
+(* are always NDJSON, so a client speaking only Content-Length framing *)
+(* will not get responses in the framing it expects.                  *)
 (* ------------------------------------------------------------------ *)
 
 let read_message () =
