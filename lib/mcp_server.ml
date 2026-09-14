@@ -189,14 +189,19 @@ let search ~token : tool_def =
 let inspect ~token : tool_def =
   { name = "rocq_inspect"
   ; description =
-      "Inspect a Rocq term or object using Check, Print, About, or Locate. \
-       Returns type signatures, full definitions, documentation, or location \
-       information.\n\n\
+      "Inspect a Rocq term or object using Check, Print, About, Locate, or \
+       Print Assumptions. Returns type signatures, full definitions, \
+       documentation, location information, or the axioms a proof depends \
+       on.\n\n\
        Commands:\n\
        - \"check\": show the type of a term (e.g. \"Nat.add\")\n\
        - \"print\": show the full definition of an object\n\
        - \"about\": show information including implicit arguments and scopes\n\
-       - \"locate\": show the full qualified name and module of an identifier\n\n\
+       - \"locate\": show the full qualified name and module of an identifier\n\
+       - \"assumptions\": list the axioms and admitted lemmas a theorem \
+       transitively depends on (Print Assumptions), or \"Closed under the \
+       global context\" if there are none -- use this to confirm a proof is \
+       axiom-free before closing it out\n\n\
        Provide either session_id (to inspect in a proof context) or file_path \
        (to inspect from a file's root context). session_id takes precedence."
   ; params =
@@ -205,9 +210,11 @@ let inspect ~token : tool_def =
       ; optional_string "file_path"
           "Absolute path to a .v file (alternative to session_id)"
       ; required_string "command"
-          "Inspection command: \"check\", \"print\", \"about\", or \"locate\""
+          "Inspection command: \"check\", \"print\", \"about\", \"locate\", \
+           or \"assumptions\""
       ; required_string "term"
-          "The term, definition, or identifier to inspect"
+          "The term, definition, or identifier to inspect (for \
+           \"assumptions\", the fully-defined theorem or lemma name)"
       ]
   ; handler =
       (fun args ->

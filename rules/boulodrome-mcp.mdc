@@ -38,6 +38,7 @@ Use `rocq_try_tactics` to test several candidate tactics **without modifying the
   - `"print"` — show the full definition body
   - `"about"` — show implicit arguments, scopes, and other metadata
   - `"locate"` — show the fully qualified name and module
+  - `"assumptions"` — list axioms and admitted lemmas a theorem depends on; use this to confirm a development is axiom-free before closing it out
 - Works in a proof session (`session_id`) or from a file context (`file_path`).
 - **Always inspect before using an unfamiliar lemma or definition** — verify its type rather than guessing.
 
