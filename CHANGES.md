@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-09-14)
 
 - Add `rocq_proof_script` tool to retrieve the exact sequence of tactics committed in a session, verbatim and in order, so a proof can be spliced back into the source file without hand-transcribing it from the conversation (which risks breaking `;`-chained tactics that apply across multiple goals)
 - Add `"assumptions"` command to `rocq_inspect` (`Print Assumptions`), to check whether a proof depends on any axioms or admitted lemmas without leaving the MCP
