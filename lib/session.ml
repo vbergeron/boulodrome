@@ -1,8 +1,14 @@
 open Petanque
 
+type meta =
+  { file_path : string
+  ; theorem_name : string
+  }
+
 type session_state =
   { current : Agent.State.t
   ; history : Agent.State.t list
+  ; meta : meta
   }
 
 type error =
@@ -28,12 +34,25 @@ let get_state session_id =
 let get session_id =
   get_state session_id |> Result.map (fun s -> s.current)
 
+let create session_id ~file_path ~theorem_name st =
+  Hashtbl.replace table session_id
+    { current = st; history = []; meta = { file_path; theorem_name } }
+
 let set session_id st =
-  let history = match get_state session_id with
-    | Ok s -> s.current :: s.history
-    | Error _ -> []
-  in
-  Hashtbl.replace table session_id { current = st; history }
+  match get_state session_id with
+  | Ok s ->
+    Hashtbl.replace table session_id
+      { current = st; history = s.current :: s.history; meta = s.meta }
+  | Error _ ->
+    (* Every existing caller of [set] first calls [get]/[get_state]
+       successfully, so this should not happen in practice. Fall back to
+       creating the session with empty metadata rather than dropping the
+       state on the floor. *)
+    Hashtbl.replace table session_id
+      { current = st
+      ; history = []
+      ; meta = { file_path = ""; theorem_name = "" }
+      }
 
 let undo session_id n =
   match get_state session_id with
@@ -44,7 +63,7 @@ let undo session_id n =
     match dropped with
     | [] -> Error (NoUndo session_id)
     | prev :: rest ->
-      Hashtbl.replace table session_id { current = prev; history = rest };
+      Hashtbl.replace table session_id { current = prev; history = rest; meta = s.meta };
       Ok (n, prev)
 
 let remove session_id =
@@ -54,3 +73,7 @@ let remove session_id =
   end
   else
     Error (NoSession session_id)
+
+let list () =
+  Hashtbl.fold (fun session_id s acc -> (session_id, s) :: acc) table []
+  |> List.sort (fun (a, _) (b, _) -> String.compare a b)

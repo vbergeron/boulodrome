@@ -15,7 +15,7 @@ let run ~token ~file_path ~theorem_name ~session_id ?pre_commands () =
          | Ok g -> Goal.format g
          | Error _ -> "(goals unavailable)"
        in
-       Session.set session_id rr.Agent.Run_result.st;
+       Session.create session_id ~file_path ~theorem_name rr.Agent.Run_result.st;
        let msg =
          Printf.sprintf
            "Started proof of '%s' in %s\nSession: %s\nProof finished: %b\n%s"
