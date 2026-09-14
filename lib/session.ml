@@ -7,7 +7,11 @@ type meta =
 
 type session_state =
   { current : Agent.State.t
-  ; history : Agent.State.t list
+  ; history : (string * Agent.State.t) list
+    (* Committed (tactic, prior_state) pairs, most recent first: [tac] is
+       the tactic text that was run against [prior_state] to reach the
+       state that was [current] at the time. Kept alongside [history] (not
+       merged into [meta]) so undo can drop both in lockstep. *)
   ; meta : meta
   }
 
@@ -38,11 +42,11 @@ let create session_id ~file_path ~theorem_name st =
   Hashtbl.replace table session_id
     { current = st; history = []; meta = { file_path; theorem_name } }
 
-let set session_id st =
+let set session_id ~tac st =
   match get_state session_id with
   | Ok s ->
     Hashtbl.replace table session_id
-      { current = st; history = s.current :: s.history; meta = s.meta }
+      { current = st; history = (tac, s.current) :: s.history; meta = s.meta }
   | Error _ ->
     (* Every existing caller of [set] first calls [get]/[get_state]
        successfully, so this should not happen in practice. Fall back to
@@ -59,12 +63,21 @@ let undo session_id n =
   | Error e -> Error e
   | Ok s ->
     let n = min n (List.length s.history) in
-    let dropped = List.to_seq s.history |> Seq.drop (n - 1) |> List.of_seq in
-    match dropped with
+    let remaining = List.to_seq s.history |> Seq.drop (n - 1) |> List.of_seq in
+    match remaining with
     | [] -> Error (NoUndo session_id)
-    | prev :: rest ->
+    | (_tac, prev) :: rest ->
       Hashtbl.replace table session_id { current = prev; history = rest; meta = s.meta };
       Ok (n, prev)
+
+(* Committed tactics for a session, oldest first, in the exact form they
+   were submitted -- suitable for pasting verbatim between [Proof.] and
+   [Qed.]. This is the raw record of what actually ran, not a
+   reconstruction, so it preserves `;`-chaining across goals that a
+   hand-transcribed, one-sentence-per-tactic script would break. *)
+let tactics session_id =
+  get_state session_id
+  |> Result.map (fun s -> s.history |> List.rev_map fst)
 
 let remove session_id =
   if Hashtbl.mem table session_id then begin
