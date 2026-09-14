@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix `rocq_file_toc` listing record fields (and inductive constructors) as separate top-level entries, each duplicating the full parent statement; only the statement's own top-level name is now listed, with fields/constructors still summarised in `{ ... }`
 - Fix `rocq_search` rejecting patterns whose top level uses an infix operator (e.g. `{n < m} + {n = m} + {m < n}`) by automatically retrying the query wrapped in parentheses
 
 ## 0.5.0 (2026-04-14)
