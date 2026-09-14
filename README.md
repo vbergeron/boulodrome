@@ -2,7 +2,7 @@
 
 An [MCP](https://modelcontextprotocol.io/) server that gives LLMs interactive access to the [Rocq](https://rocq-prover.org/) proof assistant via the [Petanque](https://github.com/ejgallego/coq-lsp/tree/main/petanque) API. It lets an AI assistant start proof sessions, run tactics, inspect goals, search the library, and undo steps — turning theorem proving into a tool-calling loop.
 
-Communication happens over stdio using JSON-RPC 2.0 with `Content-Length` framing, which is standard MCP transport. Logs are written to `/tmp/boulodrome.log`.
+Communication happens over stdio using JSON-RPC 2.0 with newline-delimited JSON (NDJSON) framing, as specified by the [MCP stdio transport](https://modelcontextprotocol.io/docs/concepts/transports#stdio) — one JSON object per line, no `Content-Length` headers (that framing is LSP's, not MCP's). Logs are written to `/tmp/boulodrome.log`.
 
 ---
 
