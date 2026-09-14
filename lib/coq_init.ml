@@ -93,14 +93,30 @@ type toc_entry =
   ; statement : string option
   }
 
+(* Fleche's toc maps every name reachable from a statement's [Info.t] to
+   the node of that statement -- including names that only appear as
+   [children] (record fields, inductive constructors, ...). Without this
+   check, a record with N fields shows up as N+1 identical top-level
+   entries, one per field plus one for the record itself. Keep an entry
+   only when [name] is one of the statement's own top-level names, not a
+   name it merely reports as a child. *)
+let is_top_level_name ~name (info : Lang.Ast.Info.t list option) =
+  match info with
+  | None -> true
+  | Some infos ->
+    List.exists (fun (i : Lang.Ast.Info.t) -> i.name.v = Some name) infos
+
 let toc_to_entry (name, node) =
-  let open Coq.Compat.Option.O in
-  let+ ast = Fleche.Doc.Node.ast node in
-  let info = ast.Fleche.Doc.Node.Ast.ast_info in
-  let statement =
-    Some (Format.asprintf "%a" Pp.pp_with (Coq.Ast.print ast.v))
-  in
-  (name, { info; statement })
+  match Fleche.Doc.Node.ast node with
+  | None -> None
+  | Some ast ->
+    let info = ast.Fleche.Doc.Node.Ast.ast_info in
+    if not (is_top_level_name ~name info) then None
+    else
+      let statement =
+        Some (Format.asprintf "%a" Pp.pp_with (Coq.Ast.print ast.v))
+      in
+      Some (name, { info; statement })
 
 let doc_errors (doc : Fleche.Doc.t) =
   Fleche.Doc.diags doc

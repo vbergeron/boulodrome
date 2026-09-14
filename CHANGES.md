@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix `rocq_file_toc` listing record fields (and inductive constructors) as separate top-level entries, each duplicating the full parent statement; only the statement's own top-level name is now listed, with fields/constructors still summarised in `{ ... }`
 - Add `rocq_list_sessions` tool to enumerate currently open proof sessions with their file path, theorem name, and proof status
 - Fix `rocq_search` rejecting patterns whose top level uses an infix operator (e.g. `{n < m} + {n = m} + {m < n}`) by automatically retrying the query wrapped in parentheses
 
