@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix `rocq_search` rejecting patterns whose top level uses an infix operator (e.g. `{n < m} + {n = m} + {m < n}`) by automatically retrying the query wrapped in parentheses
+
 ## 0.5.0 (2026-04-14)
 
 - Add `rocq_inspect` tool for inspecting terms with `Check`, `Print`, `About`, and `Locate`

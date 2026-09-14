@@ -1,5 +1,15 @@
 open Petanque
 
+let contains ~needle haystack =
+  let nlen = String.length needle in
+  let hlen = String.length haystack in
+  let rec check i =
+    if i + nlen > hlen then false
+    else if String.sub haystack i nlen = needle then true
+    else check (i + 1)
+  in
+  nlen = 0 || check 0
+
 let unwrap_agent label = function
   | Ok v -> Ok v
   | Error e ->

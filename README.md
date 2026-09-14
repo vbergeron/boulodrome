@@ -136,12 +136,20 @@ Provide either `session_id` (to search in a proof context) or `file_path` (to se
 - **Scope**: `... inside ModuleName` or `... outside ModuleName`
 - **Disjunction**: `[ query1 | query2 ]`
 
+A pattern whose top level uses an infix operator -- e.g. the sumbool type
+`{n < m} + {n = m} + {m < n}` -- must be wrapped in parentheses, since Rocq's
+Search grammar otherwise splits unparenthesized whitespace-separated tokens
+into several conjunctive query items and the top-level `+` collides with
+that. If a query without outer parentheses hits this, `rocq_search`
+automatically retries it wrapped in `(...)` before giving up.
+
 #### Examples
 
 | Query | Finds |
 |-------|-------|
 | `plus_comm` | Objects matching `plus_comm` |
 | `(_ + _ = _ + _)` | Commutativity lemmas |
+| `{?n < ?m} + {?n = ?m} + {?m < ?n}` | Decidable comparisons (auto-wrapped) |
 | `"assoc"` | All names containing "assoc" |
 | `concl:(nat -> bool)` | Functions returning `bool` in the conclusion |
 | `is:Lemma (_ + _)` | Lemmas about addition |

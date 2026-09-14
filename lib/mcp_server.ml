@@ -144,6 +144,11 @@ let search ~token : tool_def =
        - Kind filter: is:Lemma, is:Definition, is:Instance, is:Fixpoint, etc.\n\
        - Scope: ... inside ModuleName  or  ... outside ModuleName\n\
        - Disjunction: [ query1 | query2 ]\n\n\
+       A pattern whose top level uses an infix operator (e.g. the sumbool \
+       type `{n < m} + {n = m} + {m < n}`) needs outer parentheses, since \
+       unparenthesized whitespace-separated tokens are otherwise split into \
+       separate conjunctive query items. If a query without them hits this, \
+       it is automatically retried wrapped in (...) before failing.\n\n\
        Examples:\n\
        - \"plus_comm\" -- find by name\n\
        - (_ + _ = _ + _) -- commutativity lemmas\n\
