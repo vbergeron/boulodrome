@@ -239,6 +239,15 @@ let undo ~token : tool_def =
         |> Result.map_error Session.error_to_string)
   }
 
+let list_sessions ~token : tool_def =
+  { name = "rocq_list_sessions"
+  ; description =
+      "List all currently open proof sessions, with the file path, theorem \
+       name, and proof status (complete, in progress, or unknown) for each."
+  ; params = []
+  ; handler = (fun _args -> List_sessions.run ~token ())
+  }
+
 let end_session : tool_def =
   { name = "rocq_end_session"
   ; description = "Close a proof session and free its state"
@@ -264,6 +273,7 @@ let config ~token : Mcp.config =
       ; diagnostics ~token
       ; search ~token
       ; inspect ~token
+      ; list_sessions ~token
       ; end_session
       ]
   }

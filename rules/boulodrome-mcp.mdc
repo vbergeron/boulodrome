@@ -64,3 +64,4 @@ Only write the proof script into the `.v` file **after** the session reports pro
 
 Call `rocq_end_session` when the proof is complete or abandoned.
 Write the progress so far using `admit.` and `Admitted.` to gracefully finish incomplete proofs.
+If you lose track of which sessions are still open (e.g. after holding several alongside each other), call `rocq_list_sessions` to see every open session's file, theorem, and proof status.
