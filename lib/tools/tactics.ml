@@ -14,11 +14,17 @@ let format_feedback (rr : Agent.State.t Agent.Run_result.t) =
       else None)
     rr.Agent.Run_result.feedback
 
-let report_step buf ~verbose ~idx ~total ~tac ~goals_text ~feedback =
+(* Header + feedback are always shown. The goal state itself is shown
+   exactly once per tactic: always on completion (it's the one thing that
+   matters), always on the last tactic of a batch (so the final state is
+   never left unshown), and on every step when [verbose] (to trace
+   progress across a multi-tactic batch). *)
+let report_step buf ~verbose ~is_last ~idx ~total ~tac ~goals_text ~complete
+    ~feedback =
   Buffer.add_string buf
     (Printf.sprintf "Executed (%d/%d): %s\n" (idx + 1) total tac);
   List.iter (fun l -> Buffer.add_string buf (l ^ "\n")) feedback;
-  if verbose || total = 1 then begin
+  if complete || verbose || is_last then begin
     Buffer.add_string buf goals_text;
     Buffer.add_char buf '\n'
   end
@@ -29,12 +35,7 @@ let report_failure buf ~idx ~total ~tac ~error ~goals_text =
                      State is at tactic %d. Current goals:\n%s"
        (idx + 1) total tac error idx goals_text)
 
-let report_final buf ~goals_text ~complete =
-  let status = if complete then "Proof complete!" else "Proof in progress." in
-  Buffer.add_string buf (Printf.sprintf "%s\n" status);
-  Buffer.add_string buf goals_text
-
-let exec_one ~token ~st buf ~verbose ~idx ~total ~tac =
+let exec_one ~token ~st buf ~verbose ~is_last ~idx ~total ~tac =
   match Agent.run ~token ~st ~tac () with
   | Error e ->
     let goals_text, _ = query_goals ~token ~st ~fallback_complete:false in
@@ -48,12 +49,9 @@ let exec_one ~token ~st buf ~verbose ~idx ~total ~tac =
         ~fallback_complete:rr.Agent.Run_result.proof_finished
     in
     let feedback = format_feedback rr in
-    report_step buf ~verbose ~idx ~total ~tac ~goals_text ~feedback;
-    if complete then begin
-      Buffer.add_string buf "No remaining goals — proof complete!\n";
-      Ok (st', Complete)
-    end
-    else Ok (st', Continue)
+    report_step buf ~verbose ~is_last ~idx ~total ~tac ~goals_text ~complete
+      ~feedback;
+    Ok (st', if complete then Complete else Continue)
 
 let run ~token ~session_id ~tac_list ~verbose () =
   match tac_list with
@@ -65,14 +63,10 @@ let run ~token ~session_id ~tac_list ~verbose () =
        let total = List.length tac_list in
        let buf = Buffer.create 256 in
        let rec go idx st = function
-         | [] ->
-           let goals_text, complete =
-             query_goals ~token ~st ~fallback_complete:false
-           in
-           report_final buf ~goals_text ~complete;
-           Ok (Buffer.contents buf)
+         | [] -> Ok (Buffer.contents buf)
          | tac :: rest ->
-           (match exec_one ~token ~st buf ~verbose ~idx ~total ~tac with
+           let is_last = rest = [] in
+           (match exec_one ~token ~st buf ~verbose ~is_last ~idx ~total ~tac with
             | Error e -> Error e
             | Ok (_, Complete) -> Ok (Buffer.contents buf)
             | Ok (st', Continue) ->
@@ -92,6 +86,8 @@ let try_run ~token ~session_id ~tac_list ~verbose:_ () =
        let buf = Buffer.create 256 in
        List.iteri
          (fun idx tac ->
-           ignore (exec_one ~token ~st buf ~verbose:true ~idx ~total ~tac))
+           ignore
+             (exec_one ~token ~st buf ~verbose:true ~is_last:true ~idx ~total
+                ~tac))
          tac_list;
        Ok (Buffer.contents buf))
