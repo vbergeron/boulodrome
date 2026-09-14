@@ -1,17 +1,18 @@
 open Petanque
 
-type kind = Check | Print | About | Locate
+type kind = Check | Print | About | Locate | Assumptions
 
 let kind_of_string = function
   | "check" -> Ok Check
   | "print" -> Ok Print
   | "about" -> Ok About
   | "locate" -> Ok Locate
+  | "assumptions" -> Ok Assumptions
   | s ->
     Error
       (Printf.sprintf
-         "Unknown command '%s'. Use \"check\", \"print\", \"about\", or \
-          \"locate\"."
+         "Unknown command '%s'. Use \"check\", \"print\", \"about\", \
+          \"locate\", or \"assumptions\"."
          s)
 
 let command_of_kind = function
@@ -19,6 +20,7 @@ let command_of_kind = function
   | Print -> "Print"
   | About -> "About"
   | Locate -> "Locate"
+  | Assumptions -> "Print Assumptions"
 
 let run ~token ~source ~command ~term () =
   match Search.get_state ~token source with

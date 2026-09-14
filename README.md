@@ -162,14 +162,14 @@ For `kind="search_rewrite"`: finds rewrite lemmas where one side of an equality 
 
 ### `rocq_inspect`
 
-Inspect a Rocq term or object using `Check`, `Print`, `About`, or `Locate`. Returns type signatures, full definitions, documentation, or location information.
+Inspect a Rocq term or object using `Check`, `Print`, `About`, `Locate`, or `Print Assumptions`. Returns type signatures, full definitions, documentation, location information, or the axioms a proof depends on.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `session_id` | string | no | Session whose context to inspect in (provide this or `file_path`) |
 | `file_path` | string | no | Absolute path to a `.v` file (alternative to `session_id`) |
-| `command` | string | yes | `"check"`, `"print"`, `"about"`, or `"locate"` |
-| `term` | string | yes | The term, definition, or identifier to inspect |
+| `command` | string | yes | `"check"`, `"print"`, `"about"`, `"locate"`, or `"assumptions"` |
+| `term` | string | yes | The term, definition, or identifier to inspect (for `"assumptions"`, the theorem or lemma name) |
 
 Provide either `session_id` (to inspect in a proof context) or `file_path` (to inspect from a file's root context). `session_id` takes precedence.
 
@@ -181,6 +181,9 @@ Provide either `session_id` (to inspect in a proof context) or `file_path` (to i
 | `print` | Show the full definition of an object | `Nat.add` → recursive definition body |
 | `about` | Show info including implicit arguments and scopes | `Nat.add` → argument details, notations |
 | `locate` | Show the full qualified name and module | `Nat.add` → `Coq.Init.Nat.add` |
+| `assumptions` | List axioms and admitted lemmas the term transitively depends on | `plus_comm` → `Closed under the global context`, or a list of axioms |
+
+`assumptions` is useful to confirm a proof development is axiom-free (no `Axiom`, `Parameter`, or `admit`/`Admitted` in its dependency chain) before closing it out, without leaving the MCP to shell out to `rocq compile`.
 
 ---
 
