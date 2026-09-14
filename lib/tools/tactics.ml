@@ -70,7 +70,7 @@ let run ~token ~session_id ~tac_list ~verbose () =
             | Error e -> Error e
             | Ok (_, Complete) -> Ok (Buffer.contents buf)
             | Ok (st', Continue) ->
-              Session.set session_id st';
+              Session.set session_id ~tac st';
               go (idx + 1) st' rest)
        in
        go 0 st tac_list)

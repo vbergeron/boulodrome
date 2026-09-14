@@ -200,6 +200,28 @@ Returns the number of steps actually undone and the goal state after undoing.
 
 ---
 
+### `rocq_proof_script`
+
+Returns the exact sequence of tactics committed so far in a session, in the order they were run, in a form valid to paste verbatim between `Proof.` and `Qed.` in the source file.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `session_id` | string | yes | Session whose committed script to retrieve |
+
+This is the actual committed record — each entry of `tac_list` ever passed to `rocq_run_tactics` that succeeded, in order — not a transcription from the conversation. Reconstructing a proof script by hand is a correctness hazard: a `tac_list` is not a proof script, since a `;`-chained tactic that applies across several goals breaks if split into separate `.`-terminated sentences. Use this tool instead of retyping the script to splice the proof back into the `.v` file.
+
+```
+Committed proof script for 'plus_comm' in /path/to/Foo.v
+All goals closed -- safe to close with Qed.
+
+--- paste verbatim between `Proof.` and `Qed.` ---
+induction n.
+- simpl. auto.
+- simpl. rewrite IHn. auto.
+```
+
+---
+
 ### `rocq_list_sessions`
 
 Lists all currently open proof sessions.

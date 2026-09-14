@@ -246,6 +246,23 @@ let undo ~token : tool_def =
         |> Result.map_error Session.error_to_string)
   }
 
+let proof_script ~token : tool_def =
+  { name = "rocq_proof_script"
+  ; description =
+      "Get the exact sequence of tactics committed so far in a session, in \
+       the order they were run and in a form valid to paste verbatim \
+       between `Proof.` and `Qed.` in the source file. This is the actual \
+       committed record, not a transcription -- use it instead of \
+       reconstructing the script by hand from the conversation, which can \
+       silently break `;`-chained tactics that apply across multiple \
+       goals."
+  ; params = [ required_string "session_id" "Session identifier" ]
+  ; handler =
+      (fun args ->
+        let* session_id = get_string args "session_id" in
+        Proof_script.run ~token ~session_id ())
+  }
+
 let list_sessions ~token : tool_def =
   { name = "rocq_list_sessions"
   ; description =
@@ -280,6 +297,7 @@ let config ~token : Mcp.config =
       ; diagnostics ~token
       ; search ~token
       ; inspect ~token
+      ; proof_script ~token
       ; list_sessions ~token
       ; end_session
       ]
