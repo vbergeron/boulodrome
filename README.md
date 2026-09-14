@@ -197,6 +197,22 @@ Returns the number of steps actually undone and the goal state after undoing.
 
 ---
 
+### `rocq_list_sessions`
+
+Lists all currently open proof sessions.
+
+No parameters.
+
+Returns, for each session: the session id, its proof status (`complete`, `in progress`, or `unknown`), the theorem name, and the file path.
+
+```
+Open sessions (2):
+- foo: in progress (theorem 'plus_comm' in /path/to/Foo.v)
+- bar: complete (theorem 'plus_assoc' in /path/to/Foo.v)
+```
+
+---
+
 ### `rocq_end_session`
 
 Closes a proof session and frees its state.
