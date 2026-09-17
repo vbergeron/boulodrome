@@ -74,7 +74,13 @@ let discover ~root =
               in
               let coq_path = Libnames.dirpath_of_string name in
               results :=
-                Dune_loadpath_record.make ~unix_path ~coq_path :: !results
+                { Loadpath.unix_path
+                ; coq_path
+                ; implicit = false
+                ; recursive = true
+                ; installed = false
+                }
+                :: !results
             | None -> ()
         end)
       entries
