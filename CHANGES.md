@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 (2026-09-17)
+
+- Fix release CI: skip the interactive confirmation and browser-open steps in `opam publish`, which made the job hang/fail non-interactively
+- Pin `dune-release` and `opam-publish` to exact versions in release CI, so a new upstream release can no longer silently change their CLI behavior mid-pipeline
+- Attach the current version's changelog section to the opam-repository pull request via `opam publish --msg-file`
+
 ## 0.6.0 (2026-09-14)
 
 - Add `rocq_proof_script` tool to retrieve the exact sequence of tactics committed in a session, verbatim and in order, so a proof can be spliced back into the source file without hand-transcribing it from the conversation (which risks breaking `;`-chained tactics that apply across multiple goals)
