@@ -37,6 +37,6 @@ jobs:
 
       - name: Submit to opam-repository
         run: |
-          opam exec -- opam publish --tag="${GITHUB_REF_NAME}"
+          opam exec -- opam publish --no-confirmation --tag="${GITHUB_REF_NAME}"
         env:
           OPAM_PUBLISH_GH_TOKEN: ${{ secrets.DUNE_RELEASE_GITHUB_TOKEN }}
