@@ -24,7 +24,7 @@ jobs:
       - run: opam exec -- dune build
 
       - name: Install release tools
-        run: opam install dune-release opam-publish
+        run: opam install dune-release.2.2.1 opam-publish.3.0.1
 
       - name: Create distribution and GitHub release
         run: |
@@ -37,6 +37,12 @@ jobs:
 
       - name: Submit to opam-repository
         run: |
-          opam exec -- opam publish --no-confirmation --no-browser --tag="${GITHUB_REF_NAME}"
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## " ver " " { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGES.md > "$RUNNER_TEMP/release-notes.md"
+          opam exec -- opam publish --no-confirmation --no-browser --msg-file="$RUNNER_TEMP/release-notes.md" --tag="${GITHUB_REF_NAME}"
         env:
           OPAM_PUBLISH_GH_TOKEN: ${{ secrets.DUNE_RELEASE_GITHUB_TOKEN }}
