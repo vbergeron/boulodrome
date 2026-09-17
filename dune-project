@@ -27,4 +27,4 @@
   (ocaml (>= 5.2.1))
   yojson
   logs
-  (coq-lsp (>= 0.2.5))))
+  (coq-lsp (>= 0.2.5+9.1))))
