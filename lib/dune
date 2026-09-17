@@ -9,15 +9,3 @@
   coq-lsp.coq
   coq-lsp.fleche
   coq-lsp.petanque))
-
-(rule
- (target dune_loadpath_record.ml)
- (deps
-  dune_loadpath_record.8_20.ml.inc
-  dune_loadpath_record.9_0.ml.inc
-  dune_loadpath_record.9_1.ml.inc
-  select_loadpath_record.sh)
- (action
-  (with-stdout-to
-   dune_loadpath_record.ml
-   (run bash select_loadpath_record.sh))))

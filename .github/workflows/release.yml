@@ -36,6 +36,18 @@ jobs:
           DUNE_RELEASE_GITHUB_TOKEN: ${{ secrets.DUNE_RELEASE_GITHUB_TOKEN }}
 
       - name: Submit to opam-repository
+        # boulodrome depends on coq-lsp, whose Loadpath.vo_path record shape
+        # differs by Rocq line (see lib/dune_loadpath_record.*.ml.inc), so we
+        # submit one opam-repository package per supported line - same
+        # "+8.20"/"+9.0"/"+9.1" scheme coq-lsp itself uses - each pinned to
+        # the matching coq/rocq-core bound via opam/boulodrome.<line>.opam.
+        #
+        # NOT independently verified against a real `opam publish` run: the
+        # positional-argument order below (PACKAGE.VERSION, then the local
+        # opam file to use in place of the auto-extracted one) is inferred
+        # from the opam-publish README, not from `opam publish --help`
+        # output. Dry-run this against a scratch fork before trusting it on
+        # a real tag push.
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           awk -v ver="$VERSION" '
@@ -43,6 +55,14 @@ jobs:
             found && /^## / { exit }
             found { print }
           ' CHANGES.md > "$RUNNER_TEMP/release-notes.md"
-          opam exec -- opam publish --no-confirmation --no-browser --msg-file="$RUNNER_TEMP/release-notes.md" --tag="${GITHUB_REF_NAME}"
+          for line in 8_20 9_0 9_1; do
+            suffix="${line/_/.}"
+            opam exec -- opam publish \
+              --no-confirmation --no-browser \
+              --msg-file="$RUNNER_TEMP/release-notes.md" \
+              --tag="${GITHUB_REF_NAME}" \
+              "boulodrome.${VERSION}+${suffix}" \
+              "opam/boulodrome.${line}.opam"
+          done
         env:
           OPAM_PUBLISH_GH_TOKEN: ${{ secrets.DUNE_RELEASE_GITHUB_TOKEN }}
