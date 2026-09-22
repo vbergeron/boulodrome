@@ -19,7 +19,7 @@ Opens a proof session for a named theorem inside a `.v` file.
 | `session_id` | string | yes | Unique identifier you choose for this session |
 | `pre_commands` | string | no | Rocq commands to execute before starting (e.g. `From Stdlib Require Import Arith.`) |
 
-Returns the initial goal state. Automatically discovers and loads Rocq loadpaths from `dune` files in the workspace.
+Returns the initial goal state, indexed as proof state `0`. Automatically discovers and loads Rocq loadpaths from `dune` files in the workspace.
 
 ---
 
@@ -34,6 +34,8 @@ Executes a list of tactics on the current proof state. Stops at the first failur
 | `verbose` | bool | no | If true, show the goal state after each tactic (default: false) |
 
 Returns the output of each tactic. If a tactic fails, the proof state is not advanced past the failure and the error message is included in the response.
+
+Every proof state reached this way is indexed under an id, reported inline as `[state N]` after the tactic that produced it (e.g. `Executed (1/3): induction n. [state 4]`). These ids are never reused or forgotten for the lifetime of the session, so any id seen in a past response can be handed to `rocq_undo`'s `proof_state_id` later to jump straight back to that exact state.
 
 ---
 
@@ -57,7 +59,7 @@ Returns the current goal state for a session.
 |-----------|------|----------|-------------|
 | `session_id` | string | yes | Session to inspect |
 
-Returns focused goals, hypotheses, and any unfocused or shelved goals.
+Returns the current proof state id followed by focused goals, hypotheses, and any unfocused or shelved goals.
 
 ---
 
@@ -216,14 +218,17 @@ NOT VERIFIED: see flagged item(s) above. Pass allowed_axioms to accept specific 
 
 ### `rocq_undo`
 
-Undoes the last N tactic steps, restoring an earlier proof state.
+Undoes tactic steps, restoring an earlier proof state -- either by counting steps back, or by jumping directly to a previously-indexed proof state id.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `session_id` | string | yes | Session to undo in |
 | `steps` | int | no | Number of steps to undo (default: 1) |
+| `proof_state_id` | int | no | Id of a proof state previously reported by `rocq_run_tactics` (or `0` for the state right after `rocq_start_proof`) to restore directly, instead of counting steps back |
 
-Returns the number of steps actually undone and the goal state after undoing.
+`proof_state_id` takes precedence over `steps` when both are given. Restoring by id is not limited to the session's current lineage -- since every proof state is indexed permanently, you can jump back to an id even after running further tactics past it, effectively switching between proof branches.
+
+Returns the number of steps actually undone (or the id restored to, when using `proof_state_id`), the resulting proof state id, and the goal state after undoing.
 
 ---
 

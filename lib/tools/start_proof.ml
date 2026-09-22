@@ -18,7 +18,11 @@ let run ~token ~file_path ~theorem_name ~session_id ?pre_commands () =
        Session.create session_id ~file_path ~theorem_name rr.Agent.Run_result.st;
        let msg =
          Printf.sprintf
-           "Started proof of '%s' in %s\nSession: %s\nProof finished: %b\n%s"
+           "Started proof of '%s' in %s\n\
+            Session: %s\n\
+            Proof finished: %b\n\
+            State: 0\n\
+            %s"
            theorem_name file_path session_id rr.Agent.Run_result.proof_finished
            goals_text
        in

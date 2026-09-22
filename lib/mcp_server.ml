@@ -262,20 +262,33 @@ let verify ~token : tool_def =
 let undo ~token : tool_def =
   { name = "rocq_undo"
   ; description =
-      "Undo the last N tactic steps in a proof session, restoring a previous \
-       proof state. Returns the goals after undoing."
+      "Undo tactic steps in a proof session, restoring a previous proof \
+       state. Every proof state reached by rocq_run_tactics is indexed \
+       under an id (reported as `[state N]` in its output); pass that id as \
+       proof_state_id to jump straight back to it instead of counting \
+       steps. proof_state_id takes precedence over steps when both are \
+       given. Returns the goals after undoing."
   ; params =
       [ required_string "session_id" "Session identifier"
       ; optional_int "steps" "Number of steps to undo (default: 1)"
+      ; optional_int "proof_state_id"
+          "Id of a proof state previously reported by rocq_run_tactics (or \
+           0 for the state right after rocq_start_proof) to restore \
+           directly, instead of counting steps back"
       ]
   ; handler =
       (fun args ->
         let* session_id = get_string args "session_id" in
-        let steps =
-          match get_int_opt args "steps" with Some n -> n | None -> 1
-        in
-        Undo.run ~token ~session_id ~steps ()
-        |> Result.map_error Session.error_to_string)
+        match get_int_opt args "proof_state_id" with
+        | Some proof_state_id ->
+          Undo.run_to ~token ~session_id ~proof_state_id ()
+          |> Result.map_error Session.error_to_string
+        | None ->
+          let steps =
+            match get_int_opt args "steps" with Some n -> n | None -> 1
+          in
+          Undo.run ~token ~session_id ~steps ()
+          |> Result.map_error Session.error_to_string)
   }
 
 let proof_script ~token : tool_def =
