@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -24,6 +25,19 @@ jobs:
           opam-repositories: |
             default: https://github.com/ocaml/opam-repository.git
             coq-released: https://coq.inria.fr/opam/released
+
+      - name: Compute weekly cache-rotation key
+        id: week
+        run: echo "value=$(date +%Y-%U)" >> "$GITHUB_OUTPUT"
+
+      # setup-ocaml caches the bare compiler switch but deliberately not opam
+      # dependencies (coq-lsp pulls in rocq-runtime/rocq-core, which compile
+      # from source and dominate build time). Cache `_opam` ourselves,
+      # rotating weekly so the opam-repository snapshot can't go stale forever.
+      - uses: actions/cache@v4
+        with:
+          path: _opam
+          key: opam-deps-${{ runner.os }}-${{ matrix.ocaml-compiler }}-${{ hashFiles('*.opam') }}-${{ steps.week.outputs.value }}
 
       - run: opam install . --deps-only --with-test
 
