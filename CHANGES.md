@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `rocq_verify` tool: compiles a file, then audits every theorem/lemma in it with `Print Assumptions`, flagging axioms or `Admitted` lemmas not covered by an optional `allowed_axioms` whitelist -- a final trust check that `rocq_run_tactics` succeeding does not by itself provide
 - Index every proof state reached by `rocq_run_tactics` under a permanent id (reported inline as `[state N]`), and add a `proof_state_id` parameter to `rocq_undo` to restore a specific indexed state directly instead of counting steps back
 - Report the current proof state id in `rocq_goals` and `rocq_start_proof` output
 

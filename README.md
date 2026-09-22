@@ -189,6 +189,33 @@ Provide either `session_id` (to inspect in a proof context) or `file_path` (to i
 
 ---
 
+### `rocq_verify`
+
+Verifies a `.v` file: confirms it compiles with no errors, then audits every `Theorem`/`Lemma`/`Corollary`/`Proposition`/`Fact`/`Remark`/`Example` in it with `Print Assumptions`, flagging any that depend on an axiom or `Admitted` lemma not covered by `allowed_axioms`.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `file_path` | string | yes | Absolute path to the `.v` file |
+| `theorem_name` | string | no | If given, only audit this theorem/lemma instead of every provable statement in the file |
+| `allowed_axioms` | string[] | no | Axiom names (or substrings) that are acceptable dependencies; any axiom not matching one of these is flagged |
+
+Use this as the final check before trusting a proof is done: `rocq_run_tactics` stopping only tells you the tactic script succeeded, not that the file is free of `Admitted` or unexpected axioms. `rocq_inspect(command="assumptions")` answers the same question for one term already in scope; `rocq_verify` does it for a whole file (or a single named theorem) in one call, and turns "does it depend on an axiom" into a pass/fail against a whitelist.
+
+If the file has compile errors, verification fails immediately and no axiom audit runs.
+
+```
+Verification of /path/to/Foo.v:
+No compile errors.
+2 theorem(s)/lemma(s) checked for axioms:
+- plus_comm: closed, no axioms
+- shady_thm: DEPENDS ON UNLISTED AXIOM(S):
+    Classical_Prop.classic : forall P : Prop, P \/ ~ P
+
+NOT VERIFIED: see flagged item(s) above. Pass allowed_axioms to accept specific axioms.
+```
+
+---
+
 ### `rocq_undo`
 
 Undoes tactic steps, restoring an earlier proof state -- either by counting steps back, or by jumping directly to a previously-indexed proof state id.

@@ -81,6 +81,7 @@ let required_int name desc = { name; desc; typ = Int; required = true }
 let optional_int name desc = { name; desc; typ = Int; required = false }
 let optional_bool name desc = { name; desc; typ = Bool; required = false }
 let required_string_array name desc = { name; desc; typ = StringArray; required = true }
+let optional_string_array name desc = { name; desc; typ = StringArray; required = false }
 
 type args = (string * Yojson.Safe.t) list
 
@@ -122,6 +123,17 @@ let get_string_list (args : args) key =
     collect [] items
   | Some _ -> Error (Printf.sprintf "Field '%s' must be an array of strings" key)
   | None -> Error (Printf.sprintf "Missing required field '%s'" key)
+
+let get_string_list_opt (args : args) key =
+  match List.assoc_opt key args with
+  | Some (`List items) ->
+    let rec collect acc = function
+      | [] -> Some (List.rev acc)
+      | `String s :: rest -> collect (s :: acc) rest
+      | _ :: _ -> None
+    in
+    collect [] items
+  | _ -> None
 
 let ( let* ) = Result.bind
 
