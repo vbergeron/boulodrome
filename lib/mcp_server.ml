@@ -227,6 +227,38 @@ let inspect ~token : tool_def =
         Inspect.run ~token ~source ~command ~term ())
   }
 
+let verify ~token : tool_def =
+  { name = "rocq_verify"
+  ; description =
+      "Verify a Coq/Rocq file: confirm it compiles with no errors, then \
+       audit every Theorem/Lemma/Corollary/Proposition/Fact/Remark/Example \
+       in it with Print Assumptions, flagging any that depend on an axiom \
+       or Admitted lemma not covered by allowed_axioms. Use this as the \
+       final check before trusting a proof is done -- rocq_run_tactics \
+       stopping only tells you the tactic script succeeded, not that the \
+       file is free of Admitted/axioms.\n\n\
+       Restrict the audit to a single theorem with theorem_name, or check \
+       every provable statement in the file by omitting it. Pass \
+       allowed_axioms to whitelist axioms that are expected/acceptable \
+       (matched by substring against the full \"name : type\" line, so a \
+       bare identifier is enough)."
+  ; params =
+      [ required_string "file_path" "Absolute path to the Coq/Rocq file"
+      ; optional_string "theorem_name"
+          "If given, only audit this theorem/lemma instead of every \
+           provable statement in the file"
+      ; optional_string_array "allowed_axioms"
+          "Axiom names (or substrings) that are acceptable dependencies; \
+           any axiom not matching one of these is flagged"
+      ]
+  ; handler =
+      (fun args ->
+        let* file_path = get_string args "file_path" in
+        let theorem_name = get_string_opt args "theorem_name" in
+        let allowed_axioms = get_string_list_opt args "allowed_axioms" in
+        Verify.run ~token ~file_path ?theorem_name ?allowed_axioms ())
+  }
+
 let undo ~token : tool_def =
   { name = "rocq_undo"
   ; description =
@@ -297,6 +329,7 @@ let config ~token : Mcp.config =
       ; diagnostics ~token
       ; search ~token
       ; inspect ~token
+      ; verify ~token
       ; proof_script ~token
       ; list_sessions ~token
       ; end_session

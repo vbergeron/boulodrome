@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `rocq_verify` tool: compiles a file, then audits every theorem/lemma in it with `Print Assumptions`, flagging axioms or `Admitted` lemmas not covered by an optional `allowed_axioms` whitelist -- a final trust check that `rocq_run_tactics` succeeding does not by itself provide
+
 ## 0.6.1 (2026-09-17)
 
 - Fix release CI: skip the interactive confirmation and browser-open steps in `opam publish`, which made the job hang/fail non-interactively
