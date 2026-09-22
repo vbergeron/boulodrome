@@ -109,7 +109,9 @@ let run ~token ~file_path ?theorem_name ?allowed_axioms () =
                    (Agent.Error.to_string e.Request.Error.payload))
             | Ok rr ->
               let st = rr.Agent.Run_result.st in
-              let allowed = Option.value allowed_axioms ~default:[] in
+              let allowed =
+                match allowed_axioms with Some l -> l | None -> []
+              in
               if targets = [] then
                 Ok
                   (Printf.sprintf
