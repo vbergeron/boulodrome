@@ -159,17 +159,18 @@ let search ~token : tool_def =
           ~desc:
             "Rocq search expression, passed verbatim (see description for syntax)")
   |> field
-       (string_param ~name:"kind"
-          ~desc:
-            "Search command: \"search\", \"search_pattern\", or \
-             \"search_rewrite\"")
+       (convert
+          (string_param ~name:"kind"
+             ~desc:
+               "Search command: \"search\", \"search_pattern\", or \
+                \"search_rewrite\"")
+          Search.kind_of_string)
   |> field
        (optional
           (int_param ~name:"max_results"
              ~desc:"Maximum number of results to return (default: 30)"))
   |> handle (fun session_id file_path query kind max_results ->
          let* source = Search.source_of_args ~session_id ~file_path in
-         let* kind = Search.kind_of_string kind in
          Search.run ~token ~source ~query ~kind ?max_results ())
 
 let inspect ~token : tool_def =
@@ -193,10 +194,12 @@ let inspect ~token : tool_def =
   |> field session_id_opt_param
   |> field file_path_opt_param
   |> field
-       (string_param ~name:"command"
-          ~desc:
-            "Inspection command: \"check\", \"print\", \"about\", \"locate\", \
-             or \"assumptions\"")
+       (convert
+          (string_param ~name:"command"
+             ~desc:
+               "Inspection command: \"check\", \"print\", \"about\", \"locate\", \
+                or \"assumptions\"")
+          Inspect.kind_of_string)
   |> field
        (string_param ~name:"term"
           ~desc:
@@ -204,7 +207,6 @@ let inspect ~token : tool_def =
              \"assumptions\", the fully-defined theorem or lemma name)")
   |> handle (fun session_id file_path command term ->
          let* source = Search.source_of_args ~session_id ~file_path in
-         let* command = Inspect.kind_of_string command in
          Inspect.run ~token ~source ~command ~term ())
 
 let verify ~token : tool_def =

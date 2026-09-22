@@ -77,6 +77,7 @@ type _ typ =
   | Bool : bool typ
   | Array : 'a typ -> 'a list typ
   | Option : 'a typ -> 'a option typ
+  | Convert : 'a typ * ('a -> ('b, string) result) -> 'b typ
 
 type 'a param = { name : string; desc : string; typ : 'a typ }
 type any_param = Any : 'a param -> any_param
@@ -87,6 +88,8 @@ let bool_param ~name ~desc = { name; desc; typ = Bool }
 let array_param ~name ~desc typ = { name; desc; typ = Array typ }
 let optional (p : 'a param) : 'a option param =
   { name = p.name; desc = p.desc; typ = Option p.typ }
+let convert (p : 'a param) (f : 'a -> ('b, string) result) : 'b param =
+  { name = p.name; desc = p.desc; typ = Convert (p.typ, f) }
 
 let rec decode_value : type a. a typ -> Yojson.Safe.t -> (a, string) result =
  fun typ json ->
@@ -110,6 +113,10 @@ let rec decode_value : type a. a typ -> Yojson.Safe.t -> (a, string) result =
   | Option t, json ->
     (match decode_value t json with
      | Ok v -> Ok (Some v)
+     | Error e -> Error e)
+  | Convert (t, f), json ->
+    (match decode_value t json with
+     | Ok v -> f v
      | Error e -> Error e)
 
 let decode_field : type a. a typ -> args -> string -> (a, string) result =
@@ -140,9 +147,11 @@ let rec schema_of : type a. a typ -> string * (string * Yojson.Safe.t) list =
     ( "array"
     , [ ("items", `Assoc (("type", `String items_type) :: items_extra)) ] )
   | Option t -> schema_of t
+  | Convert (t, _) -> schema_of t
 
-let is_required : type a. a typ -> bool = function
+let rec is_required : type a. a typ -> bool = function
   | Option _ -> false
+  | Convert (t, _) -> is_required t
   | Array _ | String | Int | Bool -> true
 
 let param_to_prop (Any p) =
