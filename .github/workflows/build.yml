@@ -26,7 +26,8 @@ jobs:
             default: https://github.com/ocaml/opam-repository.git
             coq-released: https://coq.inria.fr/opam/released
 
-      - id: week
+      - name: Compute weekly cache-rotation key
+        id: week
         run: echo "value=$(date +%Y-%U)" >> "$GITHUB_OUTPUT"
 
       # setup-ocaml caches the bare compiler switch but deliberately not opam
