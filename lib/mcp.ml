@@ -75,14 +75,6 @@ type param =
   ; required : bool
   }
 
-let required_string name desc = { name; desc; typ = String; required = true }
-let optional_string name desc = { name; desc; typ = String; required = false }
-let required_int name desc = { name; desc; typ = Int; required = true }
-let optional_int name desc = { name; desc; typ = Int; required = false }
-let optional_bool name desc = { name; desc; typ = Bool; required = false }
-let required_string_array name desc = { name; desc; typ = StringArray; required = true }
-let optional_string_array name desc = { name; desc; typ = StringArray; required = false }
-
 type args = (string * Yojson.Safe.t) list
 
 let get_string (args : args) key =

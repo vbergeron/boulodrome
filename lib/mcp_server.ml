@@ -7,19 +7,35 @@ open Mcp
 (* ------------------------------------------------------------------ *)
 
 let file_path_param =
-  required_string "file_path" "Absolute path to the Coq/Rocq file"
+  { name = "file_path"
+  ; desc = "Absolute path to the Coq/Rocq file"
+  ; typ = String
+  ; required = true
+  }
 
 let file_path_opt_param =
-  optional_string "file_path" "Absolute path to a .v file (alternative to session_id)"
+  { name = "file_path"
+  ; desc = "Absolute path to a .v file (alternative to session_id)"
+  ; typ = String
+  ; required = false
+  }
 
-let session_id_param = required_string "session_id" "Session identifier"
+let session_id_param =
+  { name = "session_id"; desc = "Session identifier"; typ = String; required = true }
 
 let session_id_opt_param =
-  optional_string "session_id" "Session identifier (provide this or file_path)"
+  { name = "session_id"
+  ; desc = "Session identifier (provide this or file_path)"
+  ; typ = String
+  ; required = false
+  }
 
 let verbose_param =
-  optional_bool "verbose"
-    "If true, show goal state after each tactic (default: false)"
+  { name = "verbose"
+  ; desc = "If true, show goal state after each tactic (default: false)"
+  ; typ = Bool
+  ; required = false
+  }
 
 let start_proof ~token : tool_def =
   { name = "rocq_start_proof"
@@ -27,11 +43,21 @@ let start_proof ~token : tool_def =
       "Start a proof session for a specific theorem in a Coq/Rocq file"
   ; params =
       [ file_path_param
-      ; required_string "theorem_name" "Name of the theorem to prove"
-      ; required_string "session_id"
-          "Unique identifier for this proof session"
-      ; optional_string "pre_commands"
-          "Optional Coq commands to execute before starting the proof"
+      ; { name = "theorem_name"
+        ; desc = "Name of the theorem to prove"
+        ; typ = String
+        ; required = true
+        }
+      ; { name = "session_id"
+        ; desc = "Unique identifier for this proof session"
+        ; typ = String
+        ; required = true
+        }
+      ; { name = "pre_commands"
+        ; desc = "Optional Coq commands to execute before starting the proof"
+        ; typ = String
+        ; required = false
+        }
       ]
   ; handler =
       (fun args ->
@@ -51,8 +77,12 @@ let run_tactics ~token : tool_def =
        state after each tactic."
   ; params =
       [ session_id_param
-      ; required_string_array "tac_list"
-          "Tactic(s) to execute, e.g. [\"induction n.\", \"simpl.\", \"auto.\"]"
+      ; { name = "tac_list"
+        ; desc =
+            "Tactic(s) to execute, e.g. [\"induction n.\", \"simpl.\", \"auto.\"]"
+        ; typ = StringArray
+        ; required = true
+        }
       ; verbose_param
       ]
   ; handler =
@@ -74,8 +104,11 @@ let try_tactics ~token : tool_def =
        Use rocq_run_tactics to commit the chosen tactic."
   ; params =
       [ session_id_param
-      ; required_string_array "tac_list"
-          "Tactic(s) to try, e.g. [\"induction n.\", \"simpl.\", \"auto.\"]"
+      ; { name = "tac_list"
+        ; desc = "Tactic(s) to try, e.g. [\"induction n.\", \"simpl.\", \"auto.\"]"
+        ; typ = StringArray
+        ; required = true
+        }
       ; verbose_param
       ]
   ; handler =
@@ -128,9 +161,13 @@ let diagnostics ~token : tool_def =
        file. Use the optional severity parameter to filter to a single level."
   ; params =
       [ file_path_param
-      ; optional_string "severity"
-          "Filter by severity: \"error\", \"warning\", \"information\", or \
-           \"hint\". If omitted, all diagnostics are returned."
+      ; { name = "severity"
+        ; desc =
+            "Filter by severity: \"error\", \"warning\", \"information\", or \
+             \"hint\". If omitted, all diagnostics are returned."
+        ; typ = String
+        ; required = false
+        }
       ]
   ; handler =
       (fun args ->
@@ -180,13 +217,24 @@ let search ~token : tool_def =
   ; params =
       [ session_id_opt_param
       ; file_path_opt_param
-      ; required_string "query"
-          "Rocq search expression, passed verbatim (see description for syntax)"
-      ; required_string "kind"
-          "Search command: \"search\", \"search_pattern\", or \
-           \"search_rewrite\""
-      ; optional_int "max_results"
-          "Maximum number of results to return (default: 30)"
+      ; { name = "query"
+        ; desc =
+            "Rocq search expression, passed verbatim (see description for syntax)"
+        ; typ = String
+        ; required = true
+        }
+      ; { name = "kind"
+        ; desc =
+            "Search command: \"search\", \"search_pattern\", or \
+             \"search_rewrite\""
+        ; typ = String
+        ; required = true
+        }
+      ; { name = "max_results"
+        ; desc = "Maximum number of results to return (default: 30)"
+        ; typ = Int
+        ; required = false
+        }
       ]
   ; handler =
       (fun args ->
@@ -221,12 +269,20 @@ let inspect ~token : tool_def =
   ; params =
       [ session_id_opt_param
       ; file_path_opt_param
-      ; required_string "command"
-          "Inspection command: \"check\", \"print\", \"about\", \"locate\", \
-           or \"assumptions\""
-      ; required_string "term"
-          "The term, definition, or identifier to inspect (for \
-           \"assumptions\", the fully-defined theorem or lemma name)"
+      ; { name = "command"
+        ; desc =
+            "Inspection command: \"check\", \"print\", \"about\", \"locate\", \
+             or \"assumptions\""
+        ; typ = String
+        ; required = true
+        }
+      ; { name = "term"
+        ; desc =
+            "The term, definition, or identifier to inspect (for \
+             \"assumptions\", the fully-defined theorem or lemma name)"
+        ; typ = String
+        ; required = true
+        }
       ]
   ; handler =
       (fun args ->
@@ -256,12 +312,20 @@ let verify ~token : tool_def =
        bare identifier is enough)."
   ; params =
       [ file_path_param
-      ; optional_string "theorem_name"
-          "If given, only audit this theorem/lemma instead of every \
-           provable statement in the file"
-      ; optional_string_array "allowed_axioms"
-          "Axiom names (or substrings) that are acceptable dependencies; \
-           any axiom not matching one of these is flagged"
+      ; { name = "theorem_name"
+        ; desc =
+            "If given, only audit this theorem/lemma instead of every \
+             provable statement in the file"
+        ; typ = String
+        ; required = false
+        }
+      ; { name = "allowed_axioms"
+        ; desc =
+            "Axiom names (or substrings) that are acceptable dependencies; \
+             any axiom not matching one of these is flagged"
+        ; typ = StringArray
+        ; required = false
+        }
       ]
   ; handler =
       (fun args ->
@@ -282,11 +346,19 @@ let undo ~token : tool_def =
        given. Returns the goals after undoing."
   ; params =
       [ session_id_param
-      ; optional_int "steps" "Number of steps to undo (default: 1)"
-      ; optional_int "proof_state_id"
-          "Id of a proof state previously reported by rocq_run_tactics (or \
-           0 for the state right after rocq_start_proof) to restore \
-           directly, instead of counting steps back"
+      ; { name = "steps"
+        ; desc = "Number of steps to undo (default: 1)"
+        ; typ = Int
+        ; required = false
+        }
+      ; { name = "proof_state_id"
+        ; desc =
+            "Id of a proof state previously reported by rocq_run_tactics (or \
+             0 for the state right after rocq_start_proof) to restore \
+             directly, instead of counting steps back"
+        ; typ = Int
+        ; required = false
+        }
       ]
   ; handler =
       (fun args ->
