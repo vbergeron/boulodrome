@@ -332,7 +332,7 @@ let list_sessions ~token : tool_def =
 let end_session : tool_def =
   { name = "rocq_end_session"
   ; description = "Close a proof session and free its state"
-  ; params = [ required_string "session_id" "Session identifier to close" ]
+  ; params = [ session_id_param ]
   ; handler =
       (fun args ->
         let* session_id = get_string args "session_id" in
