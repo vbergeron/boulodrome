@@ -59,7 +59,7 @@ let run_tactics ~token : tool_def =
           String)
   |> field verbose_param
   |> handle (fun session_id tac_list verbose ->
-         let verbose = Option.value verbose ~default:false in
+         let verbose = match verbose with Some b -> b | None -> false in
          Tactics.run ~token ~session_id ~tac_list ~verbose ())
 
 let try_tactics ~token : tool_def =
@@ -76,7 +76,7 @@ let try_tactics ~token : tool_def =
           String)
   |> field verbose_param
   |> handle (fun session_id tac_list verbose ->
-         let verbose = Option.value verbose ~default:false in
+         let verbose = match verbose with Some b -> b | None -> false in
          Tactics.try_run ~token ~session_id ~tac_list ~verbose ())
 
 let get_goals ~token : tool_def =
@@ -265,7 +265,7 @@ let undo ~token : tool_def =
            Undo.run_to ~token ~session_id ~proof_state_id ()
            |> Result.map_error Session.error_to_string
          | None ->
-           let steps = Option.value steps ~default:1 in
+           let steps = match steps with Some n -> n | None -> 1 in
            Undo.run ~token ~session_id ~steps ()
            |> Result.map_error Session.error_to_string)
 

@@ -107,7 +107,10 @@ let rec decode_value : type a. a typ -> Yojson.Safe.t -> (a, string) result =
     in
     go 0 [] items
   | Array _, _ -> Error "must be an array"
-  | Option t, json -> Result.map Option.some (decode_value t json)
+  | Option t, json ->
+    (match decode_value t json with
+     | Ok v -> Ok (Some v)
+     | Error e -> Error e)
 
 let decode_field : type a. a typ -> args -> string -> (a, string) result =
  fun typ args name ->
@@ -116,9 +119,9 @@ let decode_field : type a. a typ -> args -> string -> (a, string) result =
     (match List.assoc_opt name args with
      | None -> Ok None
      | Some json ->
-       Result.map_error
-         (Printf.sprintf "Field '%s' %s" name)
-         (Result.map Option.some (decode_value t json)))
+       (match decode_value t json with
+        | Ok v -> Ok (Some v)
+        | Error e -> Error (Printf.sprintf "Field '%s' %s" name e)))
   | _ ->
     (match List.assoc_opt name args with
      | None -> Error (Printf.sprintf "Missing required field '%s'" name)
@@ -182,7 +185,10 @@ let field (p : 'a param) (b : ('f, 'a -> 'r) builder) : ('f, 'r) builder =
       (fun args h ->
         match b.decode args h with
         | Error e -> Error e
-        | Ok partial -> Result.map partial (decode_field p.typ args p.name))
+        | Ok partial ->
+          (match decode_field p.typ args p.name with
+           | Ok v -> Ok (partial v)
+           | Error e -> Error e))
   }
 
 let handle (h : 'f) (b : ('f, (string, string) result) builder) : tool_def =
