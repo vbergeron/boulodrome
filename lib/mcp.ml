@@ -62,72 +62,91 @@ let tool_result text =
 let tool_error text =
   `Assoc [ ("content", `List [ text_content text ]); ("isError", `Bool true) ]
 
-(* ------------------------------------------------------------------ *)
-(* Params: single declaration -> schema + decoding                     *)
-(* ------------------------------------------------------------------ *)
+let ( let* ) = Result.bind
 
-type param_type = String | Int | Bool | StringArray
-
-type param =
-  { name : string
-  ; desc : string
-  ; typ : param_type
-  ; required : bool
-  }
+(* ------------------------------------------------------------------ *)
+(* Params: a GADT of argument shapes, from which both the JSON schema  *)
+(* and the decoder are derived.                                        *)
+(* ------------------------------------------------------------------ *)
 
 type args = (string * Yojson.Safe.t) list
 
-let get_string (args : args) key =
-  match List.assoc_opt key args with
-  | Some (`String s) -> Ok s
-  | Some _ -> Error (Printf.sprintf "Field '%s' must be a string" key)
-  | None -> Error (Printf.sprintf "Missing required field '%s'" key)
+type _ typ =
+  | String : string typ
+  | Int : int typ
+  | Bool : bool typ
+  | Array : 'a typ -> 'a list typ
+  | Option : 'a typ -> 'a option typ
 
-let get_string_opt (args : args) key =
-  match List.assoc_opt key args with
-  | Some (`String s) -> Some s
-  | _ -> None
+type 'a param = { name : string; desc : string; typ : 'a typ }
+type any_param = Any : 'a param -> any_param
 
-let get_int (args : args) key =
-  match List.assoc_opt key args with
-  | Some (`Int i) -> Ok i
-  | Some _ -> Error (Printf.sprintf "Field '%s' must be an integer" key)
-  | None -> Error (Printf.sprintf "Missing required field '%s'" key)
+let string_param ~name ~desc = { name; desc; typ = String }
+let int_param ~name ~desc = { name; desc; typ = Int }
+let bool_param ~name ~desc = { name; desc; typ = Bool }
+let array_param ~name ~desc typ = { name; desc; typ = Array typ }
+let optional (p : 'a param) : 'a option param =
+  { name = p.name; desc = p.desc; typ = Option p.typ }
 
-let get_int_opt (args : args) key =
-  match List.assoc_opt key args with
-  | Some (`Int i) -> Some i
-  | _ -> None
-
-let get_bool_opt (args : args) key =
-  match List.assoc_opt key args with
-  | Some (`Bool b) -> Some b
-  | _ -> None
-
-let get_string_list (args : args) key =
-  match List.assoc_opt key args with
-  | Some (`List items) ->
-    let rec collect acc = function
+let rec decode_value : type a. a typ -> Yojson.Safe.t -> (a, string) result =
+ fun typ json ->
+  match typ, json with
+  | String, `String s -> Ok s
+  | String, _ -> Error "must be a string"
+  | Int, `Int i -> Ok i
+  | Int, _ -> Error "must be an integer"
+  | Bool, `Bool b -> Ok b
+  | Bool, _ -> Error "must be a boolean"
+  | Array t, `List items ->
+    let rec go i acc = function
       | [] -> Ok (List.rev acc)
-      | `String s :: rest -> collect (s :: acc) rest
-      | _ :: _ -> Error (Printf.sprintf "Field '%s' must be an array of strings" key)
+      | x :: rest ->
+        (match decode_value t x with
+         | Ok v -> go (i + 1) (v :: acc) rest
+         | Error e -> Error (Printf.sprintf "element %d %s" i e))
     in
-    collect [] items
-  | Some _ -> Error (Printf.sprintf "Field '%s' must be an array of strings" key)
-  | None -> Error (Printf.sprintf "Missing required field '%s'" key)
+    go 0 [] items
+  | Array _, _ -> Error "must be an array"
+  | Option t, json -> Result.map Option.some (decode_value t json)
 
-let get_string_list_opt (args : args) key =
-  match List.assoc_opt key args with
-  | Some (`List items) ->
-    let rec collect acc = function
-      | [] -> Some (List.rev acc)
-      | `String s :: rest -> collect (s :: acc) rest
-      | _ :: _ -> None
-    in
-    collect [] items
-  | _ -> None
+let decode_field : type a. a typ -> args -> string -> (a, string) result =
+ fun typ args name ->
+  match typ with
+  | Option t ->
+    (match List.assoc_opt name args with
+     | None -> Ok None
+     | Some json ->
+       Result.map_error
+         (Printf.sprintf "Field '%s' %s" name)
+         (Result.map Option.some (decode_value t json)))
+  | _ ->
+    (match List.assoc_opt name args with
+     | None -> Error (Printf.sprintf "Missing required field '%s'" name)
+     | Some json ->
+       Result.map_error (Printf.sprintf "Field '%s' %s" name)
+         (decode_value typ json))
 
-let ( let* ) = Result.bind
+let rec schema_of : type a. a typ -> string * (string * Yojson.Safe.t) list =
+ fun typ ->
+  match typ with
+  | String -> "string", []
+  | Int -> "integer", []
+  | Bool -> "boolean", []
+  | Array t ->
+    let items_type, items_extra = schema_of t in
+    ( "array"
+    , [ ("items", `Assoc (("type", `String items_type) :: items_extra)) ] )
+  | Option t -> schema_of t
+
+let is_required : type a. a typ -> bool = function
+  | Option _ -> false
+  | Array _ | String | Int | Bool -> true
+
+let param_to_prop (Any p) =
+  let type_str, extra = schema_of p.typ in
+  ( p.name
+  , `Assoc (("type", `String type_str) :: ("description", `String p.desc) :: extra)
+  )
 
 (* ------------------------------------------------------------------ *)
 (* Tool definition                                                     *)
@@ -136,28 +155,55 @@ let ( let* ) = Result.bind
 type tool_def =
   { name : string
   ; description : string
-  ; params : param list
+  ; params : any_param list
   ; handler : args -> (string, string) result
   }
 
-let param_to_prop p =
-  match p.typ with
-  | StringArray ->
-    ( p.name
-    , `Assoc
-        [ ("type", `String "array")
-        ; ("items", `Assoc [ ("type", `String "string") ])
-        ; ("description", `String p.desc)
-        ] )
-  | _ ->
-    let type_str = match p.typ with String -> "string" | Int -> "integer" | Bool -> "boolean" | StringArray -> assert false in
-    (p.name, `Assoc [ ("type", `String type_str); ("description", `String p.desc) ])
+(* A builder threads a fixed handler type ['f] through, accumulating a
+   list of params and a decoder that peels one argument off ['r] (the
+   type still missing before reaching the final result) per [field]
+   call. [tool] starts with zero params consumed (['r] = ['f]); [handle]
+   supplies the handler once every param has been consumed (['r] =
+   [(string, string) result]). *)
+type ('f, 'r) builder =
+  { b_name : string
+  ; b_description : string
+  ; b_params : any_param list
+  ; decode : args -> 'f -> ('r, string) result
+  }
+
+let tool ~name ~description : ('f, 'f) builder =
+  { b_name = name; b_description = description; b_params = []; decode = (fun _ h -> Ok h) }
+
+let field (p : 'a param) (b : ('f, 'a -> 'r) builder) : ('f, 'r) builder =
+  { b with
+    b_params = Any p :: b.b_params
+  ; decode =
+      (fun args h ->
+        match b.decode args h with
+        | Error e -> Error e
+        | Ok partial -> Result.map partial (decode_field p.typ args p.name))
+  }
+
+let handle (h : 'f) (b : ('f, (string, string) result) builder) : tool_def =
+  { name = b.b_name
+  ; description = b.b_description
+  ; params = List.rev b.b_params
+  ; handler = (fun args -> b.decode args h)
+  }
+
+(* A zero-param tool has no [field] to defer evaluation past construction
+   time, so [handle]'s ['f] would collapse to the result itself and [h]
+   would run once at startup instead of per request. Take an explicit
+   thunk instead. *)
+let handle0 ~name ~description (h : unit -> (string, string) result) : tool_def =
+  { name; description; params = []; handler = (fun _args -> h ()) }
 
 let tool_to_json t =
   let props = List.map param_to_prop t.params in
   let required =
     List.filter_map
-      (fun p -> if p.required then Some (`String p.name) else None)
+      (fun (Any p) -> if is_required p.typ then Some (`String p.name) else None)
       t.params
   in
   `Assoc
@@ -242,15 +288,16 @@ let run config =
               Some (response id (`Assoc [ ("tools", `List tools_json) ]))
             | "tools/call" ->
               let obj = match params with `Assoc o -> o | _ -> [] in
-              (match get_string obj "name" with
-               | Error e -> Some (error_response id (-32602) e)
-               | Ok name ->
+              (match List.assoc_opt "name" obj with
+               | Some (`String name) ->
                  let args =
                    match List.assoc_opt "arguments" obj with
                    | Some v -> v
                    | None -> `Assoc []
                  in
-                 Some (response id (dispatch config name args)))
+                 Some (response id (dispatch config name args))
+               | _ ->
+                 Some (error_response id (-32602) "Missing required field 'name'"))
             | m when String.length m > 0 && m.[0] = '$' -> None
             | _ ->
               Some
