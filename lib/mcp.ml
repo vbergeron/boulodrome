@@ -195,7 +195,14 @@ let handle (h : 'f) (b : ('f, (string, string) result) builder) : tool_def =
   { name = b.b_name
   ; description = b.b_description
   ; params = List.rev b.b_params
-  ; handler = (fun args -> b.decode args h)
+  ; handler =
+      (fun args ->
+        (* [decode] itself succeeds/fails at parsing args; on success it
+           carries the handler's own (string, string) result, which must
+           be unwrapped rather than nested. *)
+        match b.decode args h with
+        | Ok result -> result
+        | Error e -> Error e)
   }
 
 (* A zero-param tool has no [field] to defer evaluation past construction
