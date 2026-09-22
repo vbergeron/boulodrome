@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Index every proof state reached by `rocq_run_tactics` under a permanent id (reported inline as `[state N]`), and add a `proof_state_id` parameter to `rocq_undo` to restore a specific indexed state directly instead of counting steps back
+- Report the current proof state id in `rocq_goals` and `rocq_start_proof` output
+
 ## 0.6.1 (2026-09-17)
 
 - Fix release CI: skip the interactive confirmation and browser-open steps in `opam publish`, which made the job hang/fail non-interactively

@@ -1,15 +1,17 @@
 open Petanque
 
 let run ~token ~session_id () =
-  match Session.get session_id with
+  match Session.get_state session_id with
   | Error e -> Error (Session.error_to_string e)
-  | Ok st ->
-    (match Agent.goals ~token ~st () with
+  | Ok s ->
+    (match Agent.goals ~token ~st:s.current () with
      | Error e ->
        Error
          (Printf.sprintf "Goals error: %s"
             (Agent.Error.to_string e.Request.Error.payload))
-     | Ok g -> Ok (Goal.format g))
+     | Ok g ->
+       Ok
+         (Printf.sprintf "State: %d\n%s" s.current_id (Goal.format g)))
 
 let premises ~token ~session_id () =
   match Session.get session_id with
