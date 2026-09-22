@@ -18,11 +18,20 @@ let format_feedback (rr : Agent.State.t Agent.Run_result.t) =
    exactly once per tactic: always on completion (it's the one thing that
    matters), always on the last tactic of a batch (so the final state is
    never left unshown), and on every step when [verbose] (to trace
-   progress across a multi-tactic batch). *)
-let report_step buf ~verbose ~is_last ~idx ~total ~tac ~goals_text ~complete
-    ~feedback =
+   progress across a multi-tactic batch). [state_id] is the id the
+   resulting proof state was indexed under (absent for `rocq_try_tactics`,
+   which never commits), quoted so it can be passed straight to
+   `rocq_undo`'s `proof_state_id`. *)
+let report_step buf ~verbose ~is_last ~idx ~total ~tac ~state_id ~goals_text
+    ~complete ~feedback =
+  let state_suffix =
+    match state_id with
+    | Some id -> Printf.sprintf " [state %d]" id
+    | None -> ""
+  in
   Buffer.add_string buf
-    (Printf.sprintf "Executed (%d/%d): %s\n" (idx + 1) total tac);
+    (Printf.sprintf "Executed (%d/%d): %s%s\n" (idx + 1) total tac
+       state_suffix);
   List.iter (fun l -> Buffer.add_string buf (l ^ "\n")) feedback;
   if complete || verbose || is_last then begin
     Buffer.add_string buf goals_text;
@@ -35,7 +44,8 @@ let report_failure buf ~idx ~total ~tac ~error ~goals_text =
                      State is at tactic %d. Current goals:\n%s"
        (idx + 1) total tac error idx goals_text)
 
-let exec_one ~token ~st buf ~verbose ~is_last ~idx ~total ~tac =
+let exec_one ~token ~session_id ~commit ~st buf ~verbose ~is_last ~idx ~total
+    ~tac =
   match Agent.run ~token ~st ~tac () with
   | Error e ->
     let goals_text, _ = query_goals ~token ~st ~fallback_complete:false in
@@ -44,13 +54,16 @@ let exec_one ~token ~st buf ~verbose ~is_last ~idx ~total ~tac =
     Ok (st, Complete)
   | Ok rr ->
     let st' = rr.Agent.Run_result.st in
+    let state_id =
+      if commit then Some (Session.set session_id ~tac st') else None
+    in
     let goals_text, complete =
       query_goals ~token ~st:st'
         ~fallback_complete:rr.Agent.Run_result.proof_finished
     in
     let feedback = format_feedback rr in
-    report_step buf ~verbose ~is_last ~idx ~total ~tac ~goals_text ~complete
-      ~feedback;
+    report_step buf ~verbose ~is_last ~idx ~total ~tac ~state_id ~goals_text
+      ~complete ~feedback;
     Ok (st', if complete then Complete else Continue)
 
 let run ~token ~session_id ~tac_list ~verbose () =
@@ -66,12 +79,13 @@ let run ~token ~session_id ~tac_list ~verbose () =
          | [] -> Ok (Buffer.contents buf)
          | tac :: rest ->
            let is_last = rest = [] in
-           (match exec_one ~token ~st buf ~verbose ~is_last ~idx ~total ~tac with
+           (match
+              exec_one ~token ~session_id ~commit:true ~st buf ~verbose
+                ~is_last ~idx ~total ~tac
+            with
             | Error e -> Error e
             | Ok (_, Complete) -> Ok (Buffer.contents buf)
-            | Ok (st', Continue) ->
-              Session.set session_id ~tac st';
-              go (idx + 1) st' rest)
+            | Ok (st', Continue) -> go (idx + 1) st' rest)
        in
        go 0 st tac_list)
 
@@ -87,7 +101,7 @@ let try_run ~token ~session_id ~tac_list ~verbose:_ () =
        List.iteri
          (fun idx tac ->
            ignore
-             (exec_one ~token ~st buf ~verbose:true ~is_last:true ~idx ~total
-                ~tac))
+             (exec_one ~token ~session_id ~commit:false ~st buf ~verbose:true
+                ~is_last:true ~idx ~total ~tac))
          tac_list;
        Ok (Buffer.contents buf))
