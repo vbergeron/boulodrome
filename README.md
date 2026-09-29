@@ -10,16 +10,30 @@ Communication happens over stdio using JSON-RPC 2.0 with newline-delimited JSON 
 
 ### `rocq_start_proof`
 
-Opens a proof session for a named theorem inside a `.v` file.
+Opens a proof session, either at the start of a named theorem, or at an arbitrary position inside an existing proof.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `file_path` | string | yes | Absolute path to the `.v` file |
-| `theorem_name` | string | yes | Name of the theorem to prove |
+| `theorem_name` | string | one of | Name of the theorem to prove; the session starts right after its statement, ignoring any existing proof body |
+| `position` | string | one of | Position inside a proof, as `l<line>c<col>` (1-based line, 0-based column), e.g. `l12c4` -- the format `rocq_diagnostics` reports. A full diagnostic range `l12c4-l12c10` is also accepted; its start is used |
 | `session_id` | string | yes | Unique identifier you choose for this session |
-| `pre_commands` | string | no | Rocq commands to execute before starting (e.g. `From Stdlib Require Import Arith.`) |
+| `pre_commands` | string | no | Rocq commands to execute before starting (e.g. `From Stdlib Require Import Arith.`). Only with `theorem_name` |
+
+Exactly one of `theorem_name` or `position` must be given.
 
 Returns the initial goal state, indexed as proof state `0`. Automatically discovers and loads Rocq loadpaths from `dune` files in the workspace.
+
+With `position`, the session starts from the state **after** the sentence containing that point, or after the preceding sentence if the point falls between two sentences (e.g. at the start of an indented line). If that sentence failed, the state is the one just **before** it -- so passing the start of an error reported by `rocq_diagnostics` drops you right where a broken proof needs repairing, without replaying the tactics before it. The theorem name is recovered from the enclosing proof. It is an error if no proof is open at that position.
+
+Note that `rocq_proof_script` on such a session returns only the tactics run in the session, not those already in the file before `position`: splice it in place of the file's tactics from `position` onward.
+
+```
+rocq_diagnostics(file_path="/path/Foo.v", severity="error")
+  -> l14c4-l14c9, error: Unable to unify ...
+rocq_start_proof(file_path="/path/Foo.v", position="l14c4", session_id="fix")
+  -> Started proof of 'plus_comm' in /path/Foo.v at l14c4
+```
 
 ---
 
