@@ -30,19 +30,44 @@ let verbose_param =
 let start_proof ~token : tool_def =
   tool ~name:"rocq_start_proof"
     ~description:
-      "Start a proof session for a specific theorem in a Coq/Rocq file"
+      "Start a proof session in a Coq/Rocq file, either at the beginning of \
+       a named theorem (theorem_name), or at an arbitrary point inside an \
+       existing proof (position, in the l<line>c<col> format reported by \
+       rocq_diagnostics) -- e.g. to resume a partial proof or repair one at \
+       the line where it breaks, without replaying the tactics before it. \
+       Provide exactly one of theorem_name or position."
   |> field file_path_param
   |> field
-       (string_param ~name:"theorem_name" ~desc:"Name of the theorem to prove")
+       (optional
+          (string_param ~name:"theorem_name"
+             ~desc:
+               "Name of the theorem to prove; the session starts right after \
+                its statement, ignoring any existing proof body"))
+  |> field
+       (optional
+          (convert
+             (string_param ~name:"position"
+                ~desc:
+                  "Position inside a proof, as l<line>c<col> (1-based line, \
+                   0-based column), e.g. \"l12c4\" -- the format \
+                   rocq_diagnostics reports; a full diagnostic range \
+                   \"l12c4-l12c10\" is also accepted and its start is used. \
+                   The session starts from the state after the sentence at \
+                   that position (or, if the point is between sentences, \
+                   after the preceding one). If that sentence failed, the \
+                   state is the one just before it.")
+             Start_proof.parse_position))
   |> field
        (string_param ~name:"session_id"
           ~desc:"Unique identifier for this proof session")
   |> field
        (optional
           (string_param ~name:"pre_commands"
-             ~desc:"Optional Coq commands to execute before starting the proof"))
-  |> handle (fun file_path theorem_name session_id pre_commands ->
-         Start_proof.run ~token ~file_path ~theorem_name ~session_id
+             ~desc:
+               "Optional Coq commands to execute before starting the proof \
+                (only with theorem_name)"))
+  |> handle (fun file_path theorem_name position session_id pre_commands ->
+         Start_proof.run ~token ~file_path ?theorem_name ?position ~session_id
            ?pre_commands ())
 
 let run_tactics ~token : tool_def =

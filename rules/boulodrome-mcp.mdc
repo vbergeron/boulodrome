@@ -15,6 +15,14 @@ When the boulodrome MCP tools (`rocq_*`) are available, use them for all tactica
 3. Call `rocq_start_proof` with the file path, theorem name, and a session id. Use `pre_commands` if the proof needs imports beyond what the file provides (e.g. `"From Stdlib Require Import Lia."`).
 4. The initial goal is returned by `rocq_start_proof`; no need to call `rocq_goals` separately.
 
+## Resuming or repairing an existing proof
+
+To work on a proof that already has tactics in the file (a partial proof ending in `admit.`/`Admitted.`, or one broken by an upstream change), start the session **at a position** instead of by theorem name: `rocq_start_proof` with `position: "l<line>c<col>"` (1-based line, 0-based column) instead of `theorem_name`. Do **not** replay the existing tactics by hand.
+
+- To repair a broken proof, call `rocq_diagnostics` with `severity: "error"` and pass the start of the error's range as `position` (the full `l12c4-l12c10` range is accepted too). The session starts in the state just before the failing tactic.
+- Otherwise the session starts in the state right after the sentence at that position (or after the preceding one, if the point is between sentences).
+- `rocq_proof_script` then only returns the tactics run in this session: splice them into the file **in place of** everything from that position up to `Qed.`, keeping the tactics before it.
+
 ## Developing the proof
 
 Work **one tactic at a time** (or a small batch):
